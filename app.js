@@ -1,20 +1,23 @@
-const SUPABASE_URL = 'https://rolrbrtpqbchyxmjmvzr.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_mJmJfELKk4O1HCTzoKxDdw_EWaiv4j1';
+// ==========================================
+// CRÔNICAS DE CAMELOT - APP.JS COMPLETO
+// ==========================================
 
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-let dadosFichaAtual = null; 
+let supabaseClient = null;
 let canalMesa = null;
+let gridAtivo = false;
 
-document.addEventListener('DOMContentLoaded', async () => {
-  try {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    atualizarInterfaceAuth(session?.user || null);
+document.addEventListener('DOMContentLoaded', () => {
+  // Inicializa o cliente do Supabase se estiver disponível na página
+  if (window.supabase && !supabaseClient && typeof SUPABASE_URL !== 'undefined') {
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  } else if (window.supabaseClient) {
+    supabaseClient = window.supabaseClient;
+  }
 
-    if (session?.user) {
-      carregarFichaDoUsuario(session.user.id);
-    }
-
+  // Configuração do Canal em Tempo Real (Broadcast)
+  if (supabaseClient) {
     canalMesa = supabaseClient.channel('sala-rpg-geral');
+    
     canalMesa
       .on('broadcast', { event: 'novo_mapa' }, (payload) => {
         exibirMapaNaTela(payload.payload.url);
@@ -23,587 +26,240 @@ document.addEventListener('DOMContentLoaded', async () => {
       .on('broadcast', { event: 'nova_rolagem' }, (payload) => {
         registrarRolagemHistorico(payload.payload.descricao, payload.payload.resultado, true);
       })
-      .subscribe();
-
-    carregarMapaAtual();
-    carregarGaleria();
-  } catch (err) {
-    console.error('Erro na inicialização:', err);
+      .on('broadcast', { event: 'vtt_ping' }, (payload) => {
+        criarEfeitoPing(payload.payload.x, payload.payload.y);
+      })
+      .on('broadcast', { event: 'vtt_mover_token' }, (payload) => {
+        criarElementoToken(payload.payload.id, payload.payload.nome, payload.payload.x, payload.payload.y, false);
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Conectado à Távola Redonda em Tempo Real!');
+        }
+      });
   }
 });
 
-function nickParaEmail(nick) {
-  const nickTratado = nick.trim().toLowerCase().replace(/\s+/g, '');
-  return `${nickTratado}@rpg.local`;
-}
-
-// AUTENTICAÇÃO
-async function fazerCadastro() {
-  const nick = document.getElementById('auth-nick').value;
-  const password = document.getElementById('auth-senha').value;
-
-  if (!nick || !password) return alert('Informe Nick e senha!');
-
-  const emailFake = nickParaEmail(nick);
-  const { error } = await supabaseClient.auth.signUp({
-    email: emailFake,
-    password: password,
-    options: { data: { display_name: nick } }
-  });
-
-  if (error) {
-    mostrarPopup('❌ Erro no cadastro: ' + error.message);
-  } else {
-    mostrarPopup('✅ Conta criada com sucesso! Clique em Entrar.');
-  }
-}
-
-async function fazerLogin() {
-  const nick = document.getElementById('auth-nick').value;
-  const password = document.getElementById('auth-senha').value;
-
-  if (!nick || !password) return alert('Informe Nick e senha!');
-
-  const emailFake = nickParaEmail(nick);
-  let authResult = await supabaseClient.auth.signInWithPassword({
-    email: emailFake,
-    password: password
-  });
-
-  if (authResult.error && nick.toLowerCase() === 'mestre' && password === '123456') {
-    await supabaseClient.auth.signUp({
-      email: emailFake,
-      password: password,
-      options: { data: { display_name: 'Mestre' } }
-    });
-    authResult = await supabaseClient.auth.signInWithPassword({
-      email: emailFake,
-      password: password
-    });
+// --- SISTEMA DE MENSAGENS / TOASTS (HERALDO) ---
+function mostrarPopup(mensagem) {
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    document.body.appendChild(container);
   }
 
-  if (authResult.error) {
-    mostrarPopup('❌ Nick ou senha incorretos.');
-  } else {
-    mostrarPopup('✅ Login realizado!');
-    atualizarInterfaceAuth(authResult.data.user);
-    carregarFichaDoUsuario(authResult.data.user.id);
-  }
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.innerHTML = `<span>⚔️</span> <span>${mensagem}</span>`;
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(100%)';
+    toast.style.transition = 'all 0.3s ease';
+    setTimeout(() => toast.remove(), 300);
+  }, 4000);
 }
 
-async function fazerLogout() {
-  await supabaseClient.auth.signOut();
-  atualizarInterfaceAuth(null);
-  dadosFichaAtual = null;
-  document.getElementById('container-ficha-carregada').innerHTML = '<p style="color: #a8a8b3;">Faça login para visualizar sua ficha.</p>';
-  mostrarPopup('Desconectado.');
-}
-
-function atualizarInterfaceAuth(user) {
-  const formLogin = document.getElementById('form-login');
-  const statusUsuario = document.getElementById('status-usuario');
-  const painelMapaMestre = document.getElementById('painel-mapa-mestre');
-  const painelUploadMestre = document.getElementById('painel-upload-mestre');
-  const badgeMestre = document.getElementById('badge-mestre');
-
-  if (user) {
-    formLogin.style.display = 'none';
-    statusUsuario.style.display = 'flex';
-    
-    const nickExibicao = user.user_metadata?.display_name || user.email.split('@')[0];
-    document.getElementById('user-nick-display').innerText = nickExibicao;
-
-    const ehMestre = nickExibicao.toLowerCase() === 'mestre';
-    if (ehMestre) {
-      badgeMestre.style.display = 'inline-block';
-      if (painelMapaMestre) painelMapaMestre.style.display = 'block';
-      if (painelUploadMestre) painelUploadMestre.style.display = 'block';
-    } else {
-      badgeMestre.style.display = 'none';
-      if (painelMapaMestre) painelMapaMestre.style.display = 'none';
-      if (painelUploadMestre) painelUploadMestre.style.display = 'none';
-    }
-  } else {
-    formLogin.style.display = 'flex';
-    statusUsuario.style.display = 'none';
-    if (painelMapaMestre) painelMapaMestre.style.display = 'none';
-    if (painelUploadMestre) painelUploadMestre.style.display = 'none';
-  }
-}
-
-// NAVEGAÇÃO DE ABAS
-function mudarAba(nomeAba, evento) {
-  const paineis = document.querySelectorAll('.painel');
-  paineis.forEach(p => p.classList.remove('ativo'));
-  const botoes = document.querySelectorAll('.abas-navegacao button');
-  botoes.forEach(b => b.classList.remove('ativo'));
-
-  document.getElementById(`aba-${nomeAba}`).classList.add('ativo');
-  if (evento && evento.currentTarget) {
-    evento.currentTarget.classList.add('ativo');
-  }
-}
-
-// FICHA DO PERSONAGEM
-function importarArquivoJSON(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    try {
-      dadosFichaAtual = JSON.parse(e.target.result);
-      renderizarFichaNaTela(dadosFichaAtual);
-      mostrarPopup('📄 Ficha JSON lida com sucesso! Clique em "Salvar na Nuvem".');
-    } catch (err) {
-      alert('Arquivo JSON inválido.');
-    }
-  };
-  reader.readAsText(file);
-}
-
-async function salvarFichaNoSupabase() {
-  const { data: { session } } = await supabaseClient.auth.getSession();
-  if (!session) return alert('Você precisa estar logado para salvar sua ficha!');
-  if (!dadosFichaAtual) return alert('Importe um arquivo JSON de ficha primeiro!');
-
-  const nomeChar = dadosFichaAtual.nome || dadosFichaAtual.personagem_nome || 'Personagem';
-
-  const { error } = await supabaseClient
-    .from('fichas')
-    .upsert({
-      user_id: session.user.id,
-      nome_personagem: nomeChar,
-      dados_ficha: dadosFichaAtual,
-      updated_at: new Date()
-    }, { onConflict: 'user_id' });
-
-  if (error) {
-    mostrarPopup('❌ Erro ao salvar: ' + error.message);
-  } else {
-    mostrarPopup('💾 Ficha salva na nuvem com sucesso!');
-  }
-}
-
-async function carregarFichaDoUsuario(userId) {
-  const { data } = await supabaseClient
-    .from('fichas')
-    .select('*')
-    .eq('user_id', userId)
-    .single();
-
-  if (data && data.dados_ficha) {
-    dadosFichaAtual = data.dados_ficha;
-    renderizarFichaNaTela(dadosFichaAtual);
-  }
-}
-
-function renderizarFichaNaTela(dados) {
-  const container = document.getElementById('container-ficha-carregada');
-  container.innerHTML = `
-    <div style="background-color: #121214; padding: 1rem; border-radius: 6px; border: 1px solid #8257e5;">
-      <h3 style="color: #04d361; font-size: 1.4rem;">${dados.nome || dados.personagem_nome || 'Sem Nome'}</h3>
-      <p><strong>Nível:</strong> ${dados.nivel || 1} | <strong>Raça/Classe:</strong> ${dados.raca || dados.tipo_humano || ''} / ${dados.classe || ''}</p>
-      <pre style="background: #202024; padding: 0.5rem; margin-top: 1rem; border-radius: 4px; max-height: 250px; overflow: auto; font-size: 0.8rem; color: #a8a8b3;">${JSON.stringify(dados, null, 2)}</pre>
-    </div>
-  `;
-}
-
-// FICHAS DO GRUPO
-async function carregarFichasDoGrupo() {
-  const lista = document.getElementById('lista-fichas-grupo');
-  lista.innerHTML = '<p style="color: #a8a8b3;">Carregando fichas...</p>';
-
-  const { data, error } = await supabaseClient
-    .from('fichas')
-    .select('*');
-
-  if (error || !data || data.length === 0) {
-    lista.innerHTML = '<p style="color: #a8a8b3;">Nenhuma ficha encontrada no grupo.</p>';
-    return;
-  }
-
-  lista.innerHTML = '';
-  data.forEach(item => {
-    const card = document.createElement('div');
-    card.style.cssText = 'background: #202024; padding: 1rem; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #29292e;';
-    card.innerHTML = `
-      <div>
-        <strong style="color: #fff; font-size: 1.1rem;">${item.nome_personagem}</strong>
-      </div>
-      <button onclick='abrirFichaGrupo(${JSON.stringify(item.dados_ficha)})' style="background: #8257e5; color: #fff; border: none; padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font-weight: bold;">Ver Ficha</button>
-    `;
-    lista.appendChild(card);
-  });
-}
-
-function abrirFichaGrupo(dados) {
-  document.getElementById('modal-titulo-personagem').innerText = dados.nome || dados.personagem_nome || 'Personagem';
-  
-  const formatarValorOuObjeto = (val) => {
-    if (!val) return '-';
-    if (typeof val === 'object') {
-      return Object.entries(val).map(([k, v]) => `<strong>${k}:</strong> ${v}`).join(' | ');
-    }
-    return val;
-  };
-
-  const periciasHTML = dados.pericias || dados.grimorio_pericias ? (() => {
-    const periciasObj = dados.pericias || dados.grimorio_pericias;
-    if (typeof periciasObj === 'object') {
-      return Object.entries(periciasObj).map(([k, v]) => `<div style="background: #0b0d12; padding: 6px 10px; border: 1px solid #4a3d24; border-radius: 4px; font-size: 0.9rem;"><span style="color: #f3d075;">${k}:</span> ${v}</div>`).join('');
-    }
-    return `<div style="background: #0b0d12; padding: 6px 10px; border: 1px solid #4a3d24; border-radius: 4px;">${periciasObj}</div>`;
-  })() : '<span style="color: #a8a8b3;">Nenhuma perícia registrada.</span>';
-
-  const sinergiaHTML = dados.sinergia_elemental || dados.elementos ? (() => {
-    const elemObj = dados.sinergia_elemental || dados.elementos;
-    if (typeof elemObj === 'object') {
-      return Object.entries(elemObj).map(([k, v]) => `<div style="background: #0b0d12; padding: 6px; border: 1px solid #4a3d24; border-radius: 4px; text-align: center;"><span style="font-size: 0.75rem; color: #e6ca88; text-transform: uppercase;">${k}</span><br><strong style="font-size: 1.1rem;">${v}</strong></div>`).join('');
-    }
-    return '';
-  })() : '';
-
-  document.getElementById('modal-conteudo-ficha').innerHTML = `
-    <div style="background-color: #151821; border: 2px solid #c5a059; padding: 20px; border-radius: 6px; color: #e2d9c5; font-family: 'EB Garamond', serif; max-height: 80vh; overflow-y: auto;">
-      
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; border-bottom: 1px solid #4a3d24; padding-bottom: 15px;">
-        <div>
-          <strong style="color: #f3d075; font-family: 'Cinzel', serif;">Nome do Cavaleiro:</strong> 
-          <div style="background: #0b0d12; padding: 8px; border: 1px solid #4a3d24; border-radius: 4px; margin-top: 4px;">${dados.nome || dados.personagem_nome || '-'}</div>
-        </div>
-        <div>
-          <strong style="color: #f3d075; font-family: 'Cinzel', serif;">Título / Epíteto:</strong> 
-          <div style="background: #0b0d12; padding: 8px; border: 1px solid #4a3d24; border-radius: 4px; margin-top: 4px;">${dados.titulo || dados.epiteton || '-'}</div>
-        </div>
-        <div>
-          <strong style="color: #f3d075; font-family: 'Cinzel', serif;">Tipo Humano (Raça):</strong> 
-          <div style="background: #0b0d12; padding: 8px; border: 1px solid #4a3d24; border-radius: 4px; margin-top: 4px;">${dados.tipo_humano || dados.raca || '-'}</div>
-        </div>
-        <div>
-          <strong style="color: #f3d075; font-family: 'Cinzel', serif;">Antecedente:</strong> 
-          <div style="background: #0b0d12; padding: 8px; border: 1px solid #4a3d24; border-radius: 4px; margin-top: 4px;">${dados.antecedente || '-'}</div>
-        </div>
-      </div>
-
-      <h3 style="color: #f3d075; font-family: 'Cinzel', serif; font-size: 1.1rem; margin-bottom: 8px;">Atributos Vitais (Automáticos)</h3>
-      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 15px;">
-        <div style="background: #0b0d12; padding: 8px; border: 1px solid #4a3d24; border-radius: 4px; text-align: center;">
-          <span style="font-size: 0.8rem; color: #e6ca88;">Vida</span><br><strong style="font-size: 1.2rem; color: #ff5252;">${dados.vida || dados.hp || 0}</strong>
-        </div>
-        <div style="background: #0b0d12; padding: 8px; border: 1px solid #4a3d24; border-radius: 4px; text-align: center;">
-          <span style="font-size: 0.8rem; color: #e6ca88;">Vigor</span><br><strong style="font-size: 1.2rem; color: #ffab40;">${dados.vigor || 0}</strong>
-        </div>
-        <div style="background: #0b0d12; padding: 8px; border: 1px solid #4a3d24; border-radius: 4px; text-align: center;">
-          <span style="font-size: 0.8rem; color: #e6ca88;">Mana</span><br><strong style="font-size: 1.2rem; color: #448aff;">${dados.mana || 0}</strong>
-        </div>
-        <div style="background: #0b0d12; padding: 8px; border: 1px solid #4a3d24; border-radius: 4px; text-align: center;">
-          <span style="font-size: 0.8rem; color: #e6ca88;">CA Base</span><br><strong style="font-size: 1.2rem; color: #00e676;">${dados.ca_base || dados.ca || 10}</strong>
-        </div>
-      </div>
-      <div style="margin-bottom: 15px;">
-        <div style="background: #0b0d12; padding: 8px; border: 1px solid #4a3d24; border-radius: 4px; text-align: center;">
-          <span style="font-size: 0.8rem; color: #e6ca88;">Sanidade</span><br><strong style="font-size: 1.2rem; color: #e040fb;">${dados.sanidade || 100}</strong>
-        </div>
-      </div>
-
-      <h3 style="color: #f3d075; font-family: 'Cinzel', serif; font-size: 1.1rem; margin-bottom: 8px;">Atributos Primários</h3>
-      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px;">
-        <div style="background: #0b0d12; padding: 8px; border: 1px solid #4a3d24; border-radius: 4px; text-align: center;">
-          <span style="font-size: 0.8rem; color: #e6ca88;">Força</span><br><strong style="font-size: 1.2rem;">${dados.attr_forca || dados.forca || 1}</strong>
-        </div>
-        <div style="background: #0b0d12; padding: 8px; border: 1px solid #4a3d24; border-radius: 4px; text-align: center;">
-          <span style="font-size: 0.8rem; color: #e6ca88;">Agilidade</span><br><strong style="font-size: 1.2rem;">${dados.attr_agilidade || dados.agilidade || 1}</strong>
-        </div>
-        <div style="background: #0b0d12; padding: 8px; border: 1px solid #4a3d24; border-radius: 4px; text-align: center;">
-          <span style="font-size: 0.8rem; color: #e6ca88;">Constituição</span><br><strong style="font-size: 1.2rem;">${dados.attr_constituicao || dados.constituicao || 1}</strong>
-        </div>
-        <div style="background: #0b0d12; padding: 8px; border: 1px solid #4a3d24; border-radius: 4px; text-align: center;">
-          <span style="font-size: 0.8rem; color: #e6ca88;">Inteligência</span><br><strong style="font-size: 1.2rem;">${dados.attr_inteligencia || dados.inteligencia || 1}</strong>
-        </div>
-        <div style="background: #0b0d12; padding: 8px; border: 1px solid #4a3d24; border-radius: 4px; text-align: center;">
-          <span style="font-size: 0.8rem; color: #e6ca88;">Sabedoria</span><br><strong style="font-size: 1.2rem;">${dados.attr_sabedoria || dados.sabedoria || 1}</strong>
-        </div>
-        <div style="background: #0b0d12; padding: 8px; border: 1px solid #4a3d24; border-radius: 4px; text-align: center;">
-          <span style="font-size: 0.8rem; color: #e6ca88;">Carisma</span><br><strong style="font-size: 1.2rem;">${dados.attr_carisma || dados.carisma || 1}</strong>
-        </div>
-      </div>
-
-      <h3 style="color: #f3d075; font-family: 'Cinzel', serif; font-size: 1.1rem; margin-bottom: 8px;">Atributos Secundários e Sinergia</h3>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
-        <div style="background: #0b0d12; padding: 10px; border: 1px solid #4a3d24; border-radius: 4px;">
-          <span style="color: #f3d075; font-family: 'Cinzel', serif; font-size: 0.9rem;">Maestria:</span> <strong>${dados.maestria || '-'}</strong><br>
-          <span style="color: #f3d075; font-family: 'Cinzel', serif; font-size: 0.9rem;">Precisão:</span> <strong>${dados.precisao || '-'}</strong><br>
-          <span style="color: #f3d075; font-family: 'Cinzel', serif; font-size: 0.9rem;">Afinidade Principal:</span> <strong>${dados.afinidade_principal || '-'}</strong>
-        </div>
-        <div style="background: #0b0d12; padding: 10px; border: 1px solid #4a3d24; border-radius: 4px;">
-          <span style="color: #f3d075; font-family: 'Cinzel', serif; font-size: 0.9rem;">Polaridade Mística:</span> <strong>${dados.polaridade_mistica || '-'}</strong><br>
-          <span style="color: #f3d075; font-family: 'Cinzel', serif; font-size: 0.9rem;">Caminho Principal:</span> <strong>${dados.caminho_principal || '-'}</strong>
-        </div>
-      </div>
-
-      ${sinergiaHTML ? `
-        <h3 style="color: #f3d075; font-family: 'Cinzel', serif; font-size: 1rem; margin-bottom: 6px;">Sinergia Elemental</h3>
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 15px;">
-          ${sinergiaHTML}
-        </div>
-      ` : ''}
-
-      <h3 style="color: #f3d075; font-family: 'Cinzel', serif; font-size: 1.1rem; margin-bottom: 8px;">Grimório de Perícias</h3>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px;">
-        ${periciasHTML}
-      </div>
-
-      <div style="display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 15px;">
-        <div style="background: #0b0d12; padding: 10px; border: 1px solid #4a3d24; border-radius: 4px;">
-          <strong style="color: #f3d075; font-family: 'Cinzel', serif;">História / Origem e Passado:</strong>
-          <p style="margin: 5px 0 0 0; white-space: pre-wrap; font-size: 0.95rem; color: #a8a8b3;">${dados.historia || dados.origem_passado || 'Não registrada.'}</p>
-        </div>
-        <div style="background: #0b0d12; padding: 10px; border: 1px solid #4a3d24; border-radius: 4px;">
-          <strong style="color: #f3d075; font-family: 'Cinzel', serif;">Motivação e Juramento:</strong>
-          <p style="margin: 5px 0 0 0; white-space: pre-wrap; font-size: 0.95rem; color: #a8a8b3;">${dados.motivacao || dados.juramento || 'Não registrado.'}</p>
-        </div>
-      </div>
-
-      <div style="display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 15px;">
-        <div style="background: #0b0d12; padding: 10px; border: 1px solid #4a3d24; border-radius: 4px;">
-          <strong style="color: #f3d075; font-family: 'Cinzel', serif;">Técnicas de Arma:</strong>
-          <p style="margin: 5px 0 0 0; white-space: pre-wrap; font-size: 0.95rem; color: #a8a8b3;">${formatarValorOuObjeto(dados.tecnicas_arma)}</p>
-        </div>
-        <div style="background: #0b0d12; padding: 10px; border: 1px solid #4a3d24; border-radius: 4px;">
-          <strong style="color: #f3d075; font-family: 'Cinzel', serif;">Técnicas de Armadura:</strong>
-          <p style="margin: 5px 0 0 0; white-space: pre-wrap; font-size: 0.95rem; color: #a8a8b3;">${formatarValorOuObjeto(dados.tecnicas_armadura)}</p>
-        </div>
-        <div style="background: #0b0d12; padding: 10px; border: 1px solid #4a3d24; border-radius: 4px;">
-          <strong style="color: #f3d075; font-family: 'Cinzel', serif;">Alforge de Viagem / Inventário:</strong>
-          <p style="margin: 5px 0 0 0; white-space: pre-wrap; font-size: 0.95rem; color: #a8a8b3;">${formatarValorOuObjeto(dados.inventario || dados.alforge)}</p>
-        </div>
-      </div>
-
-    </div>
-  `;
-  document.getElementById('modal-ficha-grupo').style.display = 'flex';
-}
-
-function fecharModalFichaGrupo() {
-  document.getElementById('modal-ficha-grupo').style.display = 'none';
-}
-
-// MAPA
-async function fazerUploadMapa() {
-  const input = document.getElementById('arquivo-mapa');
-  if (!input.files || input.files.length === 0) return alert('Selecione uma imagem para o mapa!');
-
-  const file = input.files[0];
-  const fileName = `mapa_${Date.now()}.${file.name.split('.').pop()}`;
-
-  const { error } = await supabaseClient.storage
-    .from('galeria')
-    .upload(fileName, file);
-
-  if (error) return alert('Erro ao subir imagem: ' + error.message);
-
-  const { data } = supabaseClient.storage
-    .from('galeria')
-    .getPublicUrl(fileName);
-  const publicUrl = data.publicUrl;
-
-  await supabaseClient.from('mapas').upsert({ id: 1, url_mapa: publicUrl });
-
-  exibirMapaNaTela(publicUrl);
-  if (canalMesa) {
-    canalMesa.send({ type: 'broadcast', event: 'novo_mapa', payload: { url: publicUrl } });
-  }
-  mostrarPopup('🗺️ Mapa atualizado com sucesso!');
-}
-
-async function carregarMapaAtual() {
-  const { data } = await supabaseClient.from('mapas').select('url_mapa').eq('id', 1).single();
-  if (data && data.url_mapa) {
-    exibirMapaNaTela(data.url_mapa);
-  }
-}
-
-function exibirMapaNaTela(url) {
-  const container = document.getElementById('container-mapa');
-  container.innerHTML = `<img src="${url}" alt="Mapa de Batalha" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px;">`;
-}
-
-// ROLAGENS DE DADOS
+// --- SISTEMA DE ROLAGEM DE DADOS ÉPICA ---
 function rolarDado(lados) {
   const resultado = Math.floor(Math.random() * lados) + 1;
-  const userNick = document.getElementById('user-nick-display')?.innerText || 'Jogador';
-  registrarRolagemHistorico(`${userNick} rolou d${lados}`, resultado);
-}
+  const userNick = document.getElementById('user-nick-display')?.innerText || document.getElementById('input-nick')?.value || 'Cavaleiro';
+  const descricao = `${userNick} rolou d${lados}`;
 
-function rolarExpressaoPersonalizada() {
-  const expr = document.getElementById('expressao-dado').value.trim();
-  if (!expr) return alert('Digite uma expressão válida (ex: 2d20+5)');
-  
-  try {
-    const regex = /^(\d*)d(\d+)([+-]\d+)?$/i;
-    const match = expr.match(regex);
-    if (!match) return alert('Formato inválido. Use o padrão como 1d20, 2d6+3, etc.');
-
-    const qtd = match[1] ? parseInt(match[1]) : 1;
-    const lados = parseInt(match[2]);
-    const modificador = match[3] ? parseInt(match[3]) : 0;
-
-    let soma = 0;
-    let lancamentos = [];
-    for (let i = 0; i < qtd; i++) {
-      const r = Math.floor(Math.random() * lados) + 1;
-      lancamentos.push(r);
-      soma += r;
+  let mensagemExtra = '';
+  if (lados === 20) {
+    if (resultado === 20) {
+      mensagemExtra = ' ✨ BENÇÃO DA DAMA DO LAGO! Crítico Lendário!';
+    } else if (resultado === 1) {
+      mensagemExtra = ' ⚠️ DESASTRE EM CAMELOT! Falha Crítica!';
     }
-
-    const totalFinal = soma + modificador;
-    const userNick = document.getElementById('user-nick-display')?.innerText || 'Jogador';
-    const detalhe = `${qtd}d${lados}${modificador !== 0 ? (modificador > 0 ? '+'+modificador : modificador) : ''} [${lancamentos.join(', ')}]`;
-    
-    registrarRolagemHistorico(`${userNick} rolou ${detalhe}`, totalFinal);
-    document.getElementById('expressao-dado').value = '';
-  } catch (err) {
-    alert('Erro ao processar expressão.');
   }
-}
 
-function registrarRolagemHistorico(descricao, resultado, veioDoBroadcast = false) {
-  const historico = document.getElementById('historico-rolagens');
-  if (historico.querySelector('p')) historico.innerHTML = '';
-
-  const item = document.createElement('div');
-  item.style.cssText = 'background: #202024; padding: 0.6rem 1rem; border-radius: 4px; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid #8257e5;';
-  item.innerHTML = `
-    <span style="color: #a8a8b3; font-size: 0.9rem;">${descricao}</span>
-    <strong style="color: #04d361; font-size: 1.2rem;">${resultado}</strong>
-  `;
+  const textoResultado = `${descricao}: ${resultado}${mensagemExtra}`;
   
-  historico.prepend(item);
-  mostrarPopup(`🎲 ${descricao} = <strong>${resultado}</strong>`);
+  registrarRolagemHistorico(descricao, resultado, false);
+  mostrarPopup(textoResultado);
 
-  if (!veioDoBroadcast && canalMesa) {
+  // Transmite a rolagem para a mesa inteira
+  if (canalMesa) {
     canalMesa.send({
       type: 'broadcast',
       event: 'nova_rolagem',
-      payload: { descricao, resultado }
+      payload: { descricao, resultado: textoResultado }
     });
   }
 }
 
-// CHAT & GALERIA
-async function fazerUploadImagem() {
-  const input = document.getElementById('arquivo-imagem');
-  const categoria = document.getElementById('categoria-imagem').value;
-  if (!input.files || input.files.length === 0) return alert('Selecione uma imagem!');
+function registrarRolagemHistorico(descricao, resultado, externo = false) {
+  const historicoDiv = document.getElementById('historico-rolagens');
+  if (!historicoDiv) return;
 
-  const file = input.files[0];
-  const fileName = `galeria_${Date.now()}.${file.name.split('.').pop()}`;
-
-  const { error } = await supabaseClient.storage.from('galeria').upload(fileName, file);
-  if (error) return alert('Erro no upload: ' + error.message);
-
-  const { data } = supabaseClient.storage.from('galeria').getPublicUrl(fileName);
-  const publicUrl = data.publicUrl;
-
-  const { error: dbError } = await supabaseClient.from('galeria_imagens').insert({
-    url: publicUrl,
-    categoria: categoria,
-    criado_em: new Date()
-  });
-
-  if (dbError) return alert('Erro ao salvar no banco: ' + dbError.message);
-
-  mostrarPopup('🖼️ Imagem enviada com sucesso!');
-  carregarGaleria();
+  const item = document.createElement('div');
+  item.style.padding = '8px 12px';
+  item.style.marginBottom = '6px';
+  item.style.background = externo ? 'rgba(27, 42, 74, 0.4)' : 'rgba(16, 20, 31, 0.6)';
+  item.style.borderLeft = '3px solid var(--cam-gold)';
+  item.style.borderRadius = '4px';
+  item.style.fontSize = '0.95rem';
+  
+  const texto = typeof resultado === 'string' ? resultado : `${descricao} = ${resultado}`;
+  item.innerText = texto;
+  
+  historicoDiv.prepend(item);
 }
 
-async function carregarGaleria() {
-  const { data, error } = await supabaseClient
-    .from('galeria_imagens')
-    .select('*')
-    .order('criado_em', { ascending: false });
+// --- SISTEMA VTT (MAPA TÁTICO, GRELHA E TOKENS) ---
+function exibirMapaNaTela(url) {
+  const container = document.getElementById('container-mapa');
+  if (!container) return;
 
-  if (error) {
-    console.error('Erro ao buscar galeria:', error);
+  container.innerHTML = `
+    <div style="margin-bottom: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+      <button onclick="alternarGridVTT()">🗺️ Alternar Grelha</button>
+      <button onclick="adicionarTokenMesa()">🛡️ Meu Token</button>
+      <span style="font-size: 0.9rem; color: var(--cam-gold-light);">* Clique no mapa para dar Ping / Arraste seu token</span>
+    </div>
+    <div id="vtt-canvas" class="vtt-wrapper" onclick="darPingNoMapa(event)">
+      <img src="${url}" class="vtt-mapa-img" alt="Mapa Tático de Camelot">
+      <div id="vtt-grid-camada" class="vtt-grid ${gridAtivo ? 'ativo' : ''}"></div>
+      <div id="vtt-tokens-camada" style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;"></div>
+    </div>
+  `;
+}
+
+function alternarGridVTT() {
+  gridAtivo = !gridAtivo;
+  const gridDiv = document.getElementById('vtt-grid-camada');
+  if (gridDiv) {
+    gridDiv.classList.toggle('ativo', gridAtivo);
+  }
+}
+
+// Sistema de Ping (O Olhar de Merlin)
+function darPingNoMapa(event) {
+  if (event.target.classList.contains('vtt-token')) return;
+
+  const canvas = document.getElementById('vtt-canvas');
+  if (!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  
+  const x = ((event.clientX - rect.left) / rect.width) * 100;
+  const y = ((event.clientY - rect.top) / rect.height) * 100;
+
+  if (canalMesa) {
+    canalMesa.send({
+      type: 'broadcast',
+      event: 'vtt_ping',
+      payload: { x, y }
+    });
+  }
+  criarEfeitoPing(x, y);
+}
+
+function criarEfeitoPing(x, y) {
+  const canvas = document.getElementById('vtt-canvas');
+  if (!canvas) return;
+
+  const ping = document.createElement('div');
+  ping.className = 'vtt-ping';
+  ping.style.left = `${x}%`;
+  ping.style.top = `${y}%`;
+  canvas.appendChild(ping);
+
+  setTimeout(() => ping.remove(), 1000);
+}
+
+// Gestão de Tokens dos Jogadores
+function adicionarTokenMesa() {
+  const userNick = document.getElementById('user-nick-display')?.innerText || document.getElementById('input-nick')?.value || 'Cavaleiro';
+  const tokenID = 'token_' + (userNick.toLowerCase().replace(/[^a-z0-9]/g, '_'));
+  
+  if (document.getElementById(tokenID)) {
+    mostrarPopup('Seu token já está na mesa, cavaleiro!');
     return;
   }
 
-  const categorias = ['Personagens', 'Locais', 'Itens', 'Inimigos', 'Outros'];
+  criarElementoToken(tokenID, userNick, 10, 10, true);
+  
+  if (canalMesa) {
+    canalMesa.send({
+      type: 'broadcast',
+      event: 'vtt_mover_token',
+      payload: { id: tokenID, nome: userNick, x: 10, y: 10 }
+    });
+  }
+  mostrarPopup('🛡️ Token posicionado na Távola!');
+}
 
-  categorias.forEach(cat => {
-    const container = document.getElementById(`galeria-${cat.toLowerCase()}`) || 
-                      document.getElementById(`grid-${cat.toLowerCase()}`);
-    
-    if (container) {
-      const imgsCat = data ? data.filter(img => img.categoria && img.categoria.toLowerCase() === cat.toLowerCase()) : [];
-      
-      if (imgsCat.length === 0) {
-        container.innerHTML = `<p style="color: #a8a8b3; font-size: 0.85rem; padding: 10px;">[${cat}]</p>`;
-      } else {
-        container.innerHTML = '';
-        container.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; padding: 10px;';
-        imgsCat.forEach(img => {
-          const card = document.createElement('div');
-          card.style.cssText = 'background: #202024; border: 1px solid #29292e; border-radius: 6px; overflow: hidden; cursor: pointer;';
-          card.innerHTML = `
-            <img src="${img.url}" alt="${img.categoria}" style="width: 100%; height: 120px; object-fit: cover; display: block;" onerror="this.src='https://via.placeholder.com/120?text=Erro'">
-          `;
-          card.onclick = () => abrirVisualizadorImagem(img.url, img.categoria);
-          container.appendChild(card);
-        });
-      }
-    }
-  });
+function criarElementoToken(id, nome, x, y, ehMeu = false) {
+  let camada = document.getElementById('vtt-tokens-camada');
+  if (!camada) return;
 
-  const gridGeral = document.getElementById('galeria-grid');
-  if (gridGeral) {
-    gridGeral.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; margin-top: 15px;';
-    if (!data || data.length === 0) {
-      gridGeral.innerHTML = '<p style="color: #a8a8b3;">Nenhuma imagem na galeria ainda.</p>';
-    } else {
-      gridGeral.innerHTML = '';
-      data.forEach(img => {
-        const card = document.createElement('div');
-        card.style.cssText = 'background: #202024; border: 1px solid #29292e; border-radius: 6px; overflow: hidden; cursor: pointer;';
-        card.innerHTML = `
-          <img src="${img.url}" alt="${img.categoria}" style="width: 100%; height: 150px; object-fit: cover; display: block;" onerror="this.src='https://via.placeholder.com/150?text=Erro'">
-          <div style="padding: 0.4rem; font-size: 0.8rem; color: #04d361; text-align: center; background: #121214;">[${img.categoria}]</div>
-        `;
-        card.onclick = () => abrirVisualizadorImagem(img.url, img.categoria);
-        gridGeral.appendChild(card);
+  let token = document.getElementById(id);
+  if (!token) {
+    token = document.createElement('div');
+    token.id = id;
+    token.className = 'vtt-token';
+    token.innerText = nome.substring(0, 3).toUpperCase();
+    token.title = nome;
+    camada.appendChild(token);
+  }
+
+  token.style.left = `${x}%`;
+  token.style.top = `${y}%`;
+  token.style.pointerEvents = 'auto';
+
+  if (ehMeu) {
+    ativarArrastoToken(token, id, nome);
+  }
+}
+
+function ativarArrastoToken(token, id, nome) {
+  let arrastando = false;
+
+  const iniciarArrasto = (e) => {
+    arrastando = true;
+    e.stopPropagation();
+  };
+
+  const mover = (e) => {
+    if (!arrastando) return;
+    const canvas = document.getElementById('vtt-canvas');
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    let x = ((clientX - rect.left) / rect.width) * 100;
+    let y = ((clientY - rect.top) / rect.height) * 100;
+
+    x = Math.max(0, Math.min(95, x));
+    y = Math.max(0, Math.min(95, y));
+
+    token.style.left = `${x}%`;
+    token.style.top = `${y}%`;
+
+    if (canalMesa) {
+      canalMesa.send({
+        type: 'broadcast',
+        event: 'vtt_mover_token',
+        payload: { id, nome, x, y }
       });
     }
-  }
-}
+  };
 
-function abrirVisualizadorImagem(url, categoria) {
-  let modal = document.getElementById('modal-visualizador-img');
-  if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'modal-visualizador-img';
-    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; padding: 20px;';
-    modal.innerHTML = `
-      <div style="position: relative; max-width: 90%; max-height: 85vh; text-align: center;">
-        <button onclick="document.getElementById('modal-visualizador-img').style.display='none'" style="position: absolute; top: -40px; right: 0; background: #ff5252; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold;">✕ Fechar</button>
-        <img id="img-ampliada" src="" alt="Zoom" style="max-width: 100%; max-height: 80vh; border-radius: 6px; border: 2px solid #8257e5;">
-        <div id="legenda-ampliada" style="color: #fff; margin-top: 10px; font-weight: bold; font-size: 1.1rem;"></div>
-      </div>
-    `;
-    document.body.appendChild(modal);
-  }
+  const pararArrasto = () => {
+    arrastando = false;
+  };
 
-  document.getElementById('img-ampliada').src = url;
-  document.getElementById('legenda-ampliada').innerText = `Categoria: ${categoria}`;
-  modal.style.display = 'flex';
-}
+  token.addEventListener('mousedown', iniciarArrasto);
+  window.addEventListener('mousemove', mover);
+  window.addEventListener('mouseup', pararArrasto);
 
-function mostrarPopup(texto) {
-  const container = document.getElementById('toast-container');
-  if (!container) return;
-  const toast = document.createElement('div');
-  toast.className = 'toast';
-  toast.innerHTML = texto;
-  container.appendChild(toast);
-  setTimeout(() => toast.remove(), 4000);
+  token.addEventListener('touchstart', iniciarArrasto);
+  window.addEventListener('touchmove', mover);
+  window.addEventListener('touchend', pararArrasto);
 }

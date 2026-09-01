@@ -264,19 +264,22 @@ async function carregarFichasDoGrupo() {
   }
 
   lista.innerHTML = '';
-  data.forEach(item => {
+  data.forEach((item, index) => {
     const card = document.createElement('div');
     card.style.cssText = 'background: #202024; padding: 1rem; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #29292e; margin-bottom: 8px;';
-    
-    const dadosStr = JSON.stringify(item.dados_ficha).replace(/"/g, '&quot;');
     
     card.innerHTML = `
       <div>
         <strong style="color: #fff; font-size: 1.1rem;">${item.nome_personagem}</strong>
       </div>
-      <button onclick='abrirFichaGrupo(JSON.parse("${dadosStr}"))' style="background: #8257e5; color: #fff; border: none; padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font-weight: bold;">Ver Ficha</button>
+      <button id="btn-ficha-${index}" style="background: #8257e5; color: #fff; border: none; padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font-weight: bold;">Ver Ficha</button>
     `;
     lista.appendChild(card);
+
+    // Associação limpa do evento via JavaScript direto para evitar qualquer quebra de sintaxe
+    document.getElementById(`btn-ficha-${index}`).onclick = () => {
+      abrirFichaGrupo(item.dados_ficha);
+    };
   });
 }
 

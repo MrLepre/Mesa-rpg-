@@ -4,6 +4,148 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mesa Virtual - Crônicas de Camelot</title>
+  <style>
+    /* Estilos básicos de suporte ao VTT e layout */
+    .painel { display: none; }
+    .painel.ativo { display: block; }
+    .vtt-wrapper { position: relative; display: inline-block; width: 100%; max-width: 900px; background: #000; border: 2px solid #c5a059; border-radius: 6px; overflow: hidden; cursor: crosshair; }
+    .vtt-mapa-img { width: 100%; display: block; height: auto; }
+    .vtt-grid { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; background-image: linear-gradient(to right, rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.1) 1px, transparent 1px); background-size: 50px 50px; display: none; }
+    .vtt-grid.ativo { display: block; }
+    .vtt-token { position: absolute; width: 35px; height: 35px; background: #8257e5; border: 2px solid #fff; border-radius: 50%; color: #fff; font-size: 0.75rem; font-weight: bold; display: flex; align-items: center; justify-content: center; cursor: grab; user-select: none; transform: translate(-50%, -50%); z-index: 10; box-shadow: 0 4px 6px rgba(0,0,0,0.5); }
+    .vtt-ping { position: absolute; width: 40px; height: 40px; border: 3px solid #ff5252; border-radius: 50%; transform: translate(-50%, -50%); animation: pingAnim 1s ease-out forwards; pointer-events: none; z-index: 20; }
+    @keyframes pingAnim { 0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(2.5); opacity: 0; } }
+    #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 10000; display: flex; flex-direction: column; gap: 10px; }
+    .toast { background: #202024; color: #fff; padding: 10px 15px; border-radius: 6px; border-left: 4px solid #04d361; box-shadow: 0 4px 12px rgba(0,0,0,0.5); font-size: 0.9rem; display: flex; align-items: center; gap: 8px; }
+  </style>
+</head>
+<body style="background-color: #0b0d12; color: #e2d9c5; font-family: sans-serif; margin: 0; padding: 20px;">
+
+  <!-- TOPO / HEADER -->
+  <header style="border-bottom: 2px solid #8257e5; padding-bottom: 15px; margin-bottom: 20px;">
+    <h1 style="color: #f3d075; font-family: 'Cinzel', serif; margin: 0 0 15px 0;">MESA VIRTUAL - CRÔNICAS DE CAMELOT</h1>
+    
+    <!-- Formulário de Login / Cadastro -->
+    <div id="form-login" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px;">
+      <input type="text" id="auth-nick" placeholder="Seu Nick" style="background: #121214; border: 1px solid #29292e; color: #fff; padding: 8px; border-radius: 4px;">
+      <input type="password" id="auth-senha" placeholder="Senha" style="background: #121214; border: 1px solid #29292e; color: #fff; padding: 8px; border-radius: 4px;">
+      <button onclick="fazerLogin()" style="background: #8257e5; color: #fff; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;">ENTRAR</button>
+      <button onclick="fazerCadastro()" style="background: #202024; color: #04d361; border: 1px solid #04d361; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;">CRIAR CONTA</button>
+    </div>
+
+    <!-- Status do Usuário Logado -->
+    <div id="status-usuario" style="display: none; gap: 15px; align-items: center;">
+      <span style="color: #04d361; font-weight: bold;">Logado como: <span id="user-nick-display" style="color: #fff;"></span></span>
+      <span id="badge-mestre" style="display: none; background: #c5a059; color: #000; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; font-weight: bold;">MESTRE</span>
+      <button onclick="fazerLogout()" style="background: #ff5252; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer;">Sair</button>
+    </div>
+
+    <!-- Navegação de Abas -->
+    <div class="abas-navegacao" style="display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap;">
+      <button onclick="mudarAba('ficha', event)" style="background: #202024; color: #fff; border: 1px solid #29292e; padding: 8px 15px; border-radius: 4px; cursor: pointer;">MINHA FICHA</button>
+      <button onclick="mudarAba('grupo', event); carregarFichasDoGrupo();" style="background: #202024; color: #fff; border: 1px solid #29292e; padding: 8px 15px; border-radius: 4px; cursor: pointer;">FICHAS DO GRUPO</button>
+      <button onclick="mudarAba('mapa', event)" style="background: #202024; color: #fff; border: 1px solid #29292e; padding: 8px 15px; border-radius: 4px; cursor: pointer;">MAPA</button>
+      <button onclick="mudarAba('rolagens', event)" style="background: #202024; color: #fff; border: 1px solid #29292e; padding: 8px 15px; border-radius: 4px; cursor: pointer;">ROLAGENS</button>
+      <button onclick="mudarAba('galeria', event); carregarGaleria();" style="background: #202024; color: #fff; border: 1px solid #29292e; padding: 8px 15px; border-radius: 4px; cursor: pointer;">CHAT & GALERIA</button>
+    </div>
+  </header>
+
+  <!-- CONTEÚDO DAS ABAS -->
+  <main>
+    <!-- ABA 1: MINHA FICHA -->
+    <section id="aba-ficha" class="painel ativo">
+      <h2 style="color: #f3d075; font-size: 1.2rem;">1. Importar Ficha Existente</h2>
+      <div style="margin-bottom: 15px;">
+        <input type="file" id="arquivo-json" accept=".json" onchange="importarArquivoJSON(event)" style="color: #fff;">
+        <button onclick="salvarFichaNoSupabase()" style="background: #04d361; color: #000; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-left: 10px;">Salvar na Nuvem</button>
+      </div>
+      <div id="container-ficha-carregada">
+        <p style="color: #a8a8b3;">Faça login e importe um arquivo JSON para visualizar sua ficha.</p>
+      </div>
+    </section>
+
+    <!-- ABA 2: FICHAS DO GRUPO -->
+    <section id="aba-grupo" class="painel">
+      <h2 style="color: #f3d075; font-size: 1.2rem;">Fichas dos Cavaleiros do Grupo</h2>
+      <div id="lista-fichas-grupo">
+        <p style="color: #a8a8b3;">Carregando fichas...</p>
+      </div>
+    </section>
+
+    <!-- ABA 3: MAPA -->
+    <section id="aba-mapa" class="painel">
+      <div id="painel-upload-mestre" style="display: none; margin-bottom: 15px; background: #121214; padding: 10px; border: 1px dashed #c5a059; border-radius: 6px;">
+        <h3 style="color: #f3d075; font-size: 1rem; margin-top: 0;">Painel do Mestre: Enviar Novo Mapa</h3>
+        <input type="file" id="arquivo-mapa" accept="image/*" style="color: #fff; margin-bottom: 8px; display: block;">
+        <button onclick="fazerUploadMapa()" style="background: #8257e5; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold;">Atualizar Mapa</button>
+      </div>
+      <div id="container-mapa">
+        <p style="color: #a8a8b3;">Nenhum mapa carregado no momento.</p>
+      </div>
+    </section>
+
+    <!-- ABA 4: ROLAGENS -->
+    <section id="aba-rolagens" class="painel">
+      <h2 style="color: #f3d075; font-size: 1.2rem;">Rolagem de Dados de Camelot</h2>
+      <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+        <button onclick="rolarDado(4)" style="background: #202024; color: #fff; border: 1px solid #8257e5; padding: 8px 12px; border-radius: 4px; cursor: pointer;">d4</button>
+        <button onclick="rolarDado(6)" style="background: #202024; color: #fff; border: 1px solid #8257e5; padding: 8px 12px; border-radius: 4px; cursor: pointer;">d6</button>
+        <button onclick="rolarDado(8)" style="background: #202024; color: #fff; border: 1px solid #8257e5; padding: 8px 12px; border-radius: 4px; cursor: pointer;">d8</button>
+        <button onclick="rolarDado(10)" style="background: #202024; color: #fff; border: 1px solid #8257e5; padding: 8px 12px; border-radius: 4px; cursor: pointer;">d10</button>
+        <button onclick="rolarDado(12)" style="background: #202024; color: #fff; border: 1px solid #8257e5; padding: 8px 12px; border-radius: 4px; cursor: pointer;">d12</button>
+        <button onclick="rolarDado(20)" style="background: #202024; color: #fff; border: 1px solid #8257e5; padding: 8px 12px; border-radius: 4px; cursor: pointer;">d20</button>
+        <button onclick="rolarDado(100)" style="background: #202024; color: #fff; border: 1px solid #8257e5; padding: 8px 12px; border-radius: 4px; cursor: pointer;">d100</button>
+      </div>
+      <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+        <input type="text" id="expressao-dado" placeholder="Ex: 2d20+5" style="background: #121214; border: 1px solid #29292e; color: #fff; padding: 8px; border-radius: 4px; width: 200px;">
+        <button onclick="rolarExpressaoPersonalizada()" style="background: #8257e5; color: #fff; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;">Rolar Expressão</button>
+      </div>
+      <h3 style="color: #f3d075; font-size: 1rem;">Histórico de Rolagens</h3>
+      <div id="historico-rolagens" style="background: #121214; padding: 10px; border: 1px solid #29292e; border-radius: 6px; max-height: 300px; overflow-y: auto;">
+        <p style="color: #a8a8b3;">Nenhuma rolagem realizada ainda.</p>
+      </div>
+    </section>
+
+    <!-- ABA 5: CHAT & GALERIA -->
+    <section id="aba-galeria" class="painel">
+      <h2 style="color: #f3d075; font-size: 1.2rem;">Galeria de Imagens de Camelot</h2>
+      <div id="painel-upload-mestre" style="display: none; margin-bottom: 15px; background: #121214; padding: 10px; border: 1px dashed #c5a059; border-radius: 6px;">
+        <h3 style="color: #f3d075; font-size: 1rem; margin-top: 0;">Enviar Imagem para a Galeria</h3>
+        <input type="file" id="arquivo-imagem" accept="image/*" style="color: #fff; margin-bottom: 8px; display: block;">
+        <select id="categoria-imagem" style="background: #202024; color: #fff; padding: 6px; border: 1px solid #29292e; border-radius: 4px; margin-bottom: 8px;">
+          <option value="Personagens">Personagens</option>
+          <option value="Locais">Locais</option>
+          <option value="Itens">Itens</option>
+          <option value="Inimigos">Inimigos</option>
+          <option value="Outros">Outros</option>
+        </select>
+        <button onclick="fazerUploadImagem()" style="background: #8257e5; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; display: block;">Enviar Imagem</button>
+      </div>
+      <div id="galeria-grid">
+        <p style="color: #a8a8b3;">Carregando galeria...</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL DE FICHA DO GRUPO -->
+  <div id="modal-ficha-grupo" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 9999; padding: 20px;">
+    <div style="background: #121214; border: 2px solid #8257e5; width: 100%; max-width: 800px; border-radius: 8px; padding: 20px; position: relative; max-height: 90vh; overflow-y: auto;">
+      <button onclick="fecharModalFichaGrupo()" style="position: absolute; top: 15px; right: 15px; background: #ff5252; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold;">✕ Fechar</button>
+      <h2 id="modal-titulo-personagem" style="color: #f3d075; margin-top: 0;">Ficha do Personagem</h2>
+      <div id="modal-conteudo-ficha"></div>
+    </div>
+  </div>
+
+  <!-- SCRIPTS -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app.js"></script>
+</body>
+</html><!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mesa Virtual - Crônicas de Camelot</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>

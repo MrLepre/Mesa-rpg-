@@ -842,7 +842,7 @@ function mostrarPopup(texto) {
 }
 
 // ==========================================
-// EXPORTAÇÕES GLOBAIS PARA O HTML (GARANTE QUE O ONCLICK FUNCIONE)
+// EXPORTAÇÕES GLOBAIS PARA O HTML
 // ==========================================
 window.fazerLogin = fazerLogin;
 window.fazerCadastro = fazerCadastro;

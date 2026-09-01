@@ -4,291 +4,135 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mesa Virtual - Crônicas de Camelot</title>
-  <style>
-    /* Estilos básicos de suporte ao VTT e layout */
-    .painel { display: none; }
-    .painel.ativo { display: block; }
-    .vtt-wrapper { position: relative; display: inline-block; width: 100%; max-width: 900px; background: #000; border: 2px solid #c5a059; border-radius: 6px; overflow: hidden; cursor: crosshair; }
-    .vtt-mapa-img { width: 100%; display: block; height: auto; }
-    .vtt-grid { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; background-image: linear-gradient(to right, rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.1) 1px, transparent 1px); background-size: 50px 50px; display: none; }
-    .vtt-grid.ativo { display: block; }
-    .vtt-token { position: absolute; width: 35px; height: 35px; background: #8257e5; border: 2px solid #fff; border-radius: 50%; color: #fff; font-size: 0.75rem; font-weight: bold; display: flex; align-items: center; justify-content: center; cursor: grab; user-select: none; transform: translate(-50%, -50%); z-index: 10; box-shadow: 0 4px 6px rgba(0,0,0,0.5); }
-    .vtt-ping { position: absolute; width: 40px; height: 40px; border: 3px solid #ff5252; border-radius: 50%; transform: translate(-50%, -50%); animation: pingAnim 1s ease-out forwards; pointer-events: none; z-index: 20; }
-    @keyframes pingAnim { 0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(2.5); opacity: 0; } }
-    #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 10000; display: flex; flex-direction: column; gap: 10px; }
-    .toast { background: #202024; color: #fff; padding: 10px 15px; border-radius: 6px; border-left: 4px solid #04d361; box-shadow: 0 4px 12px rgba(0,0,0,0.5); font-size: 0.9rem; display: flex; align-items: center; gap: 8px; }
-  </style>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body style="background-color: #0b0d12; color: #e2d9c5; font-family: sans-serif; margin: 0; padding: 20px;">
-
-  <!-- TOPO / HEADER -->
-  <header style="border-bottom: 2px solid #8257e5; padding-bottom: 15px; margin-bottom: 20px;">
-    <h1 style="color: #f3d075; font-family: 'Cinzel', serif; margin: 0 0 15px 0;">MESA VIRTUAL - CRÔNICAS DE CAMELOT</h1>
-    
-    <!-- Formulário de Login / Cadastro -->
-    <div id="form-login" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px;">
-      <input type="text" id="auth-nick" placeholder="Seu Nick" style="background: #121214; border: 1px solid #29292e; color: #fff; padding: 8px; border-radius: 4px;">
-      <input type="password" id="auth-senha" placeholder="Senha" style="background: #121214; border: 1px solid #29292e; color: #fff; padding: 8px; border-radius: 4px;">
-      <button onclick="fazerLogin()" style="background: #8257e5; color: #fff; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;">ENTRAR</button>
-      <button onclick="fazerCadastro()" style="background: #202024; color: #04d361; border: 1px solid #04d361; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;">CRIAR CONTA</button>
-    </div>
-
-    <!-- Status do Usuário Logado -->
-    <div id="status-usuario" style="display: none; gap: 15px; align-items: center;">
-      <span style="color: #04d361; font-weight: bold;">Logado como: <span id="user-nick-display" style="color: #fff;"></span></span>
-      <span id="badge-mestre" style="display: none; background: #c5a059; color: #000; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; font-weight: bold;">MESTRE</span>
-      <button onclick="fazerLogout()" style="background: #ff5252; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer;">Sair</button>
-    </div>
-
-    <!-- Navegação de Abas -->
-    <div class="abas-navegacao" style="display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap;">
-      <button onclick="mudarAba('ficha', event)" style="background: #202024; color: #fff; border: 1px solid #29292e; padding: 8px 15px; border-radius: 4px; cursor: pointer;">MINHA FICHA</button>
-      <button onclick="mudarAba('grupo', event); carregarFichasDoGrupo();" style="background: #202024; color: #fff; border: 1px solid #29292e; padding: 8px 15px; border-radius: 4px; cursor: pointer;">FICHAS DO GRUPO</button>
-      <button onclick="mudarAba('mapa', event)" style="background: #202024; color: #fff; border: 1px solid #29292e; padding: 8px 15px; border-radius: 4px; cursor: pointer;">MAPA</button>
-      <button onclick="mudarAba('rolagens', event)" style="background: #202024; color: #fff; border: 1px solid #29292e; padding: 8px 15px; border-radius: 4px; cursor: pointer;">ROLAGENS</button>
-      <button onclick="mudarAba('galeria', event); carregarGaleria();" style="background: #202024; color: #fff; border: 1px solid #29292e; padding: 8px 15px; border-radius: 4px; cursor: pointer;">CHAT & GALERIA</button>
+<body>
+  <header class="topo-mesa">
+    <h1>Mesa Virtual - Crônicas de Camelot</h1>
+    <div class="auth-container">
+      <div id="form-login" class="form-login">
+        <input type="text" id="auth-nick" placeholder="Seu Nick / Nome">
+        <input type="password" id="auth-senha" placeholder="Senha">
+        <button onclick="fazerLogin()">Entrar</button>
+        <button onclick="fazerCadastro()">Criar Conta</button>
+      </div>
+      <div id="status-usuario" style="display: none; align-items: center; gap: 10px;">
+        <span style="color: #04d361;">Logado como: <strong id="user-nick-display"></strong></span>
+        <span id="badge-mestre" style="display: none; background: #c5a059; color: #121214; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold;">MESTRE</span>
+        <button onclick="fazerLogout()" style="background: #ff5252; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">Sair</button>
+      </div>
     </div>
   </header>
 
-  <!-- CONTEÚDO DAS ABAS -->
+  <nav class="abas-navegacao">
+    <button class="ativo" onclick="mudarAba('ficha', event)">Minha Ficha</button>
+    <button onclick="mudarAba('grupo', event)">Fichas do Grupo</button>
+    <button onclick="mudarAba('mapa', event)">Mapa</button>
+    <button onclick="mudarAba('rolagens', event)">Rolagens</button>
+    <button onclick="mudarAba('galeria', event)">Chat & Galeria</button>
+  </nav>
+
   <main>
-    <!-- ABA 1: MINHA FICHA -->
     <section id="aba-ficha" class="painel ativo">
-      <h2 style="color: #f3d075; font-size: 1.2rem;">1. Importar Ficha Existente</h2>
-      <div style="margin-bottom: 15px;">
-        <input type="file" id="arquivo-json" accept=".json" onchange="importarArquivoJSON(event)" style="color: #fff;">
-        <button onclick="salvarFichaNoSupabase()" style="background: #04d361; color: #000; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-left: 10px;">Salvar na Nuvem</button>
+      <h2>Minha Ficha do Personagem</h2>
+      <div class="card-secao">
+        <h3>1. Importar Ficha Existente</h3>
+        <p>Selecione o arquivo .json gerado na sua ficha local:</p>
+        <input type="file" id="arquivo-json" accept=".json" onchange="importarArquivoJSON(event)">
       </div>
-      <div id="container-ficha-carregada">
+      <div class="card-secao" style="margin-top: 15px;">
+        <h3>2. Sincronização em Nuvem</h3>
+        <button onclick="salvarFichaNoSupabase()" style="background: #04d361; color: #121214; font-weight: bold; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer;">Salvar/Atualizar Ficha na Nuvem</button>
+      </div>
+      <div id="container-ficha-carregada" style="margin-top: 20px;">
         <p style="color: #a8a8b3;">Faça login e importe um arquivo JSON para visualizar sua ficha.</p>
       </div>
     </section>
 
-    <!-- ABA 2: FICHAS DO GRUPO -->
     <section id="aba-grupo" class="painel">
-      <h2 style="color: #f3d075; font-size: 1.2rem;">Fichas dos Cavaleiros do Grupo</h2>
+      <h2>Fichas dos Cavaleiros da Távola</h2>
+      <button onclick="carregarFichasDoGrupo()" style="background: #8257e5; color: #fff; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; margin-bottom: 15px;">Atualizar Lista do Grupo</button>
       <div id="lista-fichas-grupo">
         <p style="color: #a8a8b3;">Carregando fichas...</p>
       </div>
     </section>
 
-    <!-- ABA 3: MAPA -->
     <section id="aba-mapa" class="painel">
-      <div id="painel-upload-mestre" style="display: none; margin-bottom: 15px; background: #121214; padding: 10px; border: 1px dashed #c5a059; border-radius: 6px;">
-        <h3 style="color: #f3d075; font-size: 1rem; margin-top: 0;">Painel do Mestre: Enviar Novo Mapa</h3>
-        <input type="file" id="arquivo-mapa" accept="image/*" style="color: #fff; margin-bottom: 8px; display: block;">
-        <button onclick="fazerUploadMapa()" style="background: #8257e5; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold;">Atualizar Mapa</button>
+      <h2>Mapa Tático e Mini-VTT</h2>
+      <div id="painel-upload-mestre" style="display: none; background: #202024; padding: 15px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #c5a059;">
+        <h3 style="color: #c5a059; margin-bottom: 8px;">Painel do Mestre: Enviar Novo Mapa</h3>
+        <input type="file" id="arquivo-mapa" accept="image/*" style="margin-bottom: 10px; display: block;">
+        <button onclick="fazerUploadMapa()" style="background: #c5a059; color: #121214; font-weight: bold; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer;">Publicar Mapa para o Grupo</button>
       </div>
       <div id="container-mapa">
         <p style="color: #a8a8b3;">Nenhum mapa carregado no momento.</p>
       </div>
     </section>
 
-    <!-- ABA 4: ROLAGENS -->
     <section id="aba-rolagens" class="painel">
-      <h2 style="color: #f3d075; font-size: 1.2rem;">Rolagem de Dados de Camelot</h2>
-      <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
-        <button onclick="rolarDado(4)" style="background: #202024; color: #fff; border: 1px solid #8257e5; padding: 8px 12px; border-radius: 4px; cursor: pointer;">d4</button>
-        <button onclick="rolarDado(6)" style="background: #202024; color: #fff; border: 1px solid #8257e5; padding: 8px 12px; border-radius: 4px; cursor: pointer;">d6</button>
-        <button onclick="rolarDado(8)" style="background: #202024; color: #fff; border: 1px solid #8257e5; padding: 8px 12px; border-radius: 4px; cursor: pointer;">d8</button>
-        <button onclick="rolarDado(10)" style="background: #202024; color: #fff; border: 1px solid #8257e5; padding: 8px 12px; border-radius: 4px; cursor: pointer;">d10</button>
-        <button onclick="rolarDado(12)" style="background: #202024; color: #fff; border: 1px solid #8257e5; padding: 8px 12px; border-radius: 4px; cursor: pointer;">d12</button>
-        <button onclick="rolarDado(20)" style="background: #202024; color: #fff; border: 1px solid #8257e5; padding: 8px 12px; border-radius: 4px; cursor: pointer;">d20</button>
-        <button onclick="rolarDado(100)" style="background: #202024; color: #fff; border: 1px solid #8257e5; padding: 8px 12px; border-radius: 4px; cursor: pointer;">d100</button>
+      <h2>Salão de Rolagens de Dados</h2>
+      <div style="background: #202024; padding: 15px; border-radius: 6px; margin-bottom: 15px;">
+        <h3>Rolagem Rápida</h3>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
+          <button onclick="rolarDado(4)">d4</button>
+          <button onclick="rolarDado(6)">d6</button>
+          <button onclick="rolarDado(8)">d8</button>
+          <button onclick="rolarDado(10)">d10</button>
+          <button onclick="rolarDado(12)">d12</button>
+          <button onclick="rolarDado(20)">d20</button>
+          <button onclick="rolarDado(100)">d100</button>
+        </div>
       </div>
-      <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-        <input type="text" id="expressao-dado" placeholder="Ex: 2d20+5" style="background: #121214; border: 1px solid #29292e; color: #fff; padding: 8px; border-radius: 4px; width: 200px;">
-        <button onclick="rolarExpressaoPersonalizada()" style="background: #8257e5; color: #fff; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;">Rolar Expressão</button>
+      <div style="background: #202024; padding: 15px; border-radius: 6px; margin-bottom: 15px;">
+        <h3>Expressão Personalizada</h3>
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+          <input type="text" id="expressao-dado" placeholder="ex: 2d20+5" style="flex: 1; padding: 8px; background: #121214; border: 1px solid #29292e; color: #fff; border-radius: 4px;">
+          <button onclick="rolarExpressaoPersonalizada()" style="background: #8257e5; color: #fff; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;">Rolar</button>
+        </div>
       </div>
-      <h3 style="color: #f3d075; font-size: 1rem;">Histórico de Rolagens</h3>
-      <div id="historico-rolagens" style="background: #121214; padding: 10px; border: 1px solid #29292e; border-radius: 6px; max-height: 300px; overflow-y: auto;">
-        <p style="color: #a8a8b3;">Nenhuma rolagem realizada ainda.</p>
+      <div>
+        <h3>Histórico de Rolagens</h3>
+        <div id="historico-rolagens" style="margin-top: 10px; max-height: 250px; overflow-y: auto;">
+          <p style="color: #a8a8b3;">Nenhuma rolagem realizada ainda.</p>
+        </div>
       </div>
     </section>
 
-    <!-- ABA 5: CHAT & GALERIA -->
     <section id="aba-galeria" class="painel">
-      <h2 style="color: #f3d075; font-size: 1.2rem;">Galeria de Imagens de Camelot</h2>
-      <div id="painel-upload-mestre" style="display: none; margin-bottom: 15px; background: #121214; padding: 10px; border: 1px dashed #c5a059; border-radius: 6px;">
-        <h3 style="color: #f3d075; font-size: 1rem; margin-top: 0;">Enviar Imagem para a Galeria</h3>
-        <input type="file" id="arquivo-imagem" accept="image/*" style="color: #fff; margin-bottom: 8px; display: block;">
-        <select id="categoria-imagem" style="background: #202024; color: #fff; padding: 6px; border: 1px solid #29292e; border-radius: 4px; margin-bottom: 8px;">
+      <h2>Galeria e Recursos Visuais</h2>
+      <div style="background: #202024; padding: 15px; border-radius: 6px; margin-bottom: 15px;">
+        <h3>Enviar Imagem</h3>
+        <input type="file" id="arquivo-imagem" accept="image/*" style="margin-bottom: 10px; display: block;">
+        <select id="categoria-imagem" style="margin-bottom: 10px; padding: 6px; background: #121214; color: #fff; border: 1px solid #29292e; border-radius: 4px;">
           <option value="Personagens">Personagens</option>
           <option value="Locais">Locais</option>
           <option value="Itens">Itens</option>
           <option value="Inimigos">Inimigos</option>
           <option value="Outros">Outros</option>
         </select>
-        <button onclick="fazerUploadImagem()" style="background: #8257e5; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; display: block;">Enviar Imagem</button>
+        <button onclick="fazerUploadImagem()" style="background: #8257e5; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; display: block;">Enviar para Galeria</button>
       </div>
-      <div id="galeria-grid">
-        <p style="color: #a8a8b3;">Carregando galeria...</p>
+      <div>
+        <h3>Galeria Geral</h3>
+        <div id="galeria-grid">
+          <p style="color: #a8a8b3;">Carregando galeria...</p>
+        </div>
       </div>
     </section>
   </main>
 
-  <!-- MODAL DE FICHA DO GRUPO -->
-  <div id="modal-ficha-grupo" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 9999; padding: 20px;">
-    <div style="background: #121214; border: 2px solid #8257e5; width: 100%; max-width: 800px; border-radius: 8px; padding: 20px; position: relative; max-height: 90vh; overflow-y: auto;">
-      <button onclick="fecharModalFichaGrupo()" style="position: absolute; top: 15px; right: 15px; background: #ff5252; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold;">✕ Fechar</button>
-      <h2 id="modal-titulo-personagem" style="color: #f3d075; margin-top: 0;">Ficha do Personagem</h2>
-      <div id="modal-conteudo-ficha"></div>
+  <div id="modal-ficha-grupo" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 9998; justify-content: center; align-items: center; padding: 20px;">
+    <div style="background: #121214; width: 100%; max-width: 700px; border-radius: 6px; border: 2px solid #c5a059; overflow: hidden; display: flex; flex-direction: column;">
+      <div style="background: #1a1d26; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #c5a059;">
+        <h2 id="modal-titulo-personagem" style="color: #f3d075; font-size: 1.2rem; margin: 0;">Ficha do Cavaleiro</h2>
+        <button onclick="fecharModalFichaGrupo()" style="background: #ff5252; color: #fff; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-weight: bold;">✕ Fechar</button>
+      </div>
+      <div id="modal-conteudo-ficha" style="padding: 20px; overflow-y: auto; max-height: 80vh;"></div>
     </div>
   </div>
 
-  <!-- SCRIPTS -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js"></script>
-</body>
-</html><!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mesa Virtual - Crônicas de Camelot</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-</head>
-<body>
-  <div id="toast-container" class="toast-container"></div>
-
-  <header>
-    <h1>Mesa Virtual - Crônicas de Camelot</h1>
-    
-    <div id="painel-auth" class="painel-auth">
-      <div id="form-login">
-        <input type="text" id="auth-nick" placeholder="Seu Nick / Nome">
-        <input type="password" id="auth-senha" placeholder="Sua Senha">
-        <button onclick="fazerLogin()">Entrar</button>
-        <button onclick="fazerCadastro()">Criar Conta</button>
-      </div>
-
-      <div id="status-usuario" style="display: none; align-items: center; gap: 10rem;">
-        <span>Conectado: <strong id="user-nick-display"></strong> <span id="badge-mestre" style="display: none; background: #e55151; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; margin-left: 5px;">MESTRE</span></span>
-        <button onclick="fazerLogout()">Sair</button>
-      </div>
-    </div>
-
-    <nav class="abas-navegacao">
-      <button class="ativo" onclick="mudarAba('ficha', event)">Minha Ficha</button>
-      <button onclick="mudarAba('grupo', event)">Fichas do Grupo</button>
-      <button onclick="mudarAba('mapa', event)">Mapa</button>
-      <button onclick="mudarAba('dados', event)">Rolagens</button>
-      <button onclick="mudarAba('chat', event)">Chat & Galeria</button>
-    </nav>
-  </header>
-
-  <main class="mesa-container">
-    <!-- ABA MINHA FICHA -->
-    <section id="aba-ficha" class="painel ativo">
-      <h2>Minha Ficha do Personagem</h2>
-      
-      <div class="box-importacao" style="background: #202024; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; border: 1px solid #29292e;">
-        <h3>1. Importar Ficha Existente</h3>
-        <p style="font-size: 0.85rem; color: #a8a8b3; margin-bottom: 0.5rem;">Selecione o arquivo .json gerado na sua ficha local:</p>
-        <input type="file" id="arquivo-json" accept=".json" onchange="importarArquivoJSON(event)">
-
-        <hr style="border-color: #29292e; margin: 1rem 0;">
-
-        <h3>2. Sincronização em Nuvem</h3>
-        <button class="btn-salvar" onclick="salvarFichaNoSupabase()" style="background: #8257e5; color: #fff; border: none; padding: 0.6rem 1.2rem; border-radius: 4px; cursor: pointer; font-weight: bold;">💾 Salvar/Atualizar Ficha na Nuvem</button>
-
-        <div style="margin-top: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-          <input type="checkbox" id="check-publica" onchange="alterarPrivacidade()" style="width: 18px; height: 18px; cursor: pointer;">
-          <label for="check-publica" style="color: #a8a8b3; cursor: pointer;">Tornar ficha pública para outros jogadores visualizarem</label>
-        </div>
-      </div>
-
-      <div id="container-ficha-carregada" class="container-ficha">
-        <p style="color: #a8a8b3;">Faça login e importe seu arquivo .json para carregar seus dados aqui.</p>
-      </div>
-    </section>
-
-    <!-- ABA FICHAS DO GRUPO -->
-    <section id="aba-grupo" class="painel">
-      <h2>Fichas da Mesa</h2>
-      <button onclick="carregarFichasDoGrupo()" class="btn-salvar" style="background: #8257e5; color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">🔄 Atualizar Grupo</button>
-      <div id="lista-fichas-grupo" style="display: grid; gap: 1rem; margin-top: 1rem;">
-        <p style="color: #a8a8b3;">Clique em atualizar para ver as fichas do grupo.</p>
-      </div>
-    </section>
-
-    <!-- ABA MAPA -->
-    <section id="aba-mapa" class="painel">
-      <h2>Mapa de Batalha</h2>
-      
-      <div id="painel-mapa-mestre" style="display: none; background: #202024; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border: 1px solid #8257e5;">
-        <h3 style="color: #8257e5; margin-bottom: 0.5rem;">Definir Mapa da Mesa</h3>
-        <input type="file" id="arquivo-mapa" accept="image/*" style="color: #a8a8b3;">
-        <button onclick="fazerUploadMapa()" class="btn-salvar" style="background: #04d361; color: #121214; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; font-weight: bold; margin-left: 10px;">Subir e Exibir Mapa</button>
-      </div>
-
-      <div id="container-mapa" class="container-mapa" style="background: #121214; border: 1px solid #29292e; border-radius: 8px; min-height: 400px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-        <p style="color: #a8a8b3;">Aguardando mapa do Mestre...</p>
-      </div>
-    </section>
-
-    <!-- ABA ROLAGENS (RESTAURADA COM OPÇÕES DE DADOS) -->
-    <section id="aba-dados" class="painel">
-      <h2>Rolagem de Dados</h2>
-      
-      <div style="background: #202024; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; border: 1px solid #29292e;">
-        <h3 style="color: #8257e5; margin-bottom: 0.8rem;">Rolador Rápido</h3>
-        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
-          <button onclick="rolarDado(4)" style="background: #29292e; color: #fff; border: 1px solid #323238; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; font-weight: bold;">d4</button>
-          <button onclick="rolarDado(6)" style="background: #29292e; color: #fff; border: 1px solid #323238; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; font-weight: bold;">d6</button>
-          <button onclick="rolarDado(8)" style="background: #29292e; color: #fff; border: 1px solid #323238; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; font-weight: bold;">d8</button>
-          <button onclick="rolarDado(10)" style="background: #29292e; color: #fff; border: 1px solid #323238; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; font-weight: bold;">d10</button>
-          <button onclick="rolarDado(12)" style="background: #29292e; color: #fff; border: 1px solid #323238; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; font-weight: bold;">d12</button>
-          <button onclick="rolarDado(20)" style="background: #8257e5; color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; font-weight: bold;">d20</button>
-          <button onclick="rolarDado(100)" style="background: #29292e; color: #fff; border: 1px solid #323238; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; font-weight: bold;">d100</button>
-        </div>
-
-        <div style="display: flex; gap: 0.5rem; align-items: center;">
-          <input type="text" id="expressao-dado" placeholder="Ex: 2d20+5 ou 1d8+3" style="flex: 1; background: #121214; border: 1px solid #323238; color: #fff; padding: 0.6rem; border-radius: 4px;">
-          <button onclick="rolarExpressaoPersonalizada()" style="background: #04d361; color: #121214; border: none; padding: 0.6rem 1.2rem; border-radius: 4px; cursor: pointer; font-weight: bold;">Rolar Personalizado</button>
-        </div>
-      </div>
-
-      <h2>Histórico de Rolagens</h2>
-      <div id="historico-rolagens" class="box-chat" style="background: #121214; padding: 1rem; border-radius: 6px; border: 1px solid #29292e; min-height: 200px; max-height: 350px; overflow-y: auto;">
-        <p style="color: #a8a8b3;">Nenhuma rolagem recente.</p>
-      </div>
-    </section>
-
-    <!-- ABA CHAT & GALERIA -->
-    <section id="aba-chat" class="painel">
-      <h2>Mural e Galeria da Aventura</h2>
-      
-      <div id="painel-upload-mestre" style="display: none; background: #202024; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; border: 1px solid #8257e5;">
-        <h3 style="color: #8257e5; margin-bottom: 0.8rem;">Painel de Upload do Mestre</h3>
-        <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
-          <select id="categoria-imagem" style="padding: 0.5rem; background: #121214; color: #fff; border: 1px solid #323238; border-radius: 4px;">
-            <option value="Locais">Locais</option>
-            <option value="Personagens">Personagens</option>
-            <option value="Equipamentos">Equipamentos</option>
-            <option value="Importante">Importante</option>
-          </select>
-          <input type="file" id="arquivo-imagem" accept="image/*" style="color: #a8a8b3;">
-          <button onclick="fazerUploadImagem()" class="btn-salvar" style="background: #04d361; color: #121214; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; font-weight: bold;">Enviar Imagem</button>
-        </div>
-      </div>
-
-      <div id="galeria-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
-        <p style="color: #a8a8b3;">Carregando galeria...</p>
-      </div>
-    </section>
-  </main>
-
-  <!-- MODAL DE VISUALIZAÇÃO DA FICHA DO GRUPO -->
-  <div id="modal-ficha-grupo" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; overflow-y: auto; padding: 2rem;">
-    <div style="background: #121214; border: 1px solid #29292e; border-radius: 8px; width: 100%; max-width: 850px; max-height: 90vh; overflow-y: auto; padding: 2rem; position: relative;">
-      <button onclick="fecharModalFichaGrupo()" style="position: absolute; top: 1rem; right: 1rem; background: #e55151; color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; font-weight: bold;">✕ Fechar</button>
-      <h2 id="modal-titulo-personagem" style="margin-bottom: 1.5rem; color: #8257e5;">Ficha do Personagem</h2>
-      <div id="modal-conteudo-ficha" class="container-ficha">
-      </div>
-    </div>
-  </div>
+  <div id="toast-container"></div>
 
   <script src="app.js"></script>
 </body>

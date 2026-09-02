@@ -1,5 +1,5 @@
 // ==========================================
-// CRÔNICAS DE CAMELOT - APP.JS (COMPLETO E INTEGRADO)
+// CRÔNICAS DE CAMELOT - APP.JS (COMPLETO E ATUALIZADO)
 // ==========================================
 
 const SUPABASE_URL = 'https://rolrbrtpqbchyxmjmvzr.supabase.co';
@@ -13,14 +13,14 @@ let vttZoom = 100;
 let vttGridTamanho = 40;
 let ehMestreGlobal = false;
 
-// Variáveis de controle de Posição (Pan), Cadeado do Mapa e Névoa de Guerra
+// Controle de Posição (Pan), Cadeado e Névoa de Guerra (Fog of War)
 let vttPanX = 0;
 let vttPanY = 0;
 let vttMovimentoLivre = false;
 let fogAtivo = false;
 let fogReveladoCelulas = new Set();
 
-// Inicialização segura
+// Inicialização segura do Supabase
 try {
   if (window.supabase) {
     supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -394,7 +394,7 @@ function fecharModalFichaGrupo() {
   if (modalGrupo) modalGrupo.style.display = 'none';
 }
 
-// --- MAPA E MINI-VTT (OTIMIZADO PARA MOBILE + FOG OF WAR) ---
+// --- MAPA E MINI-VTT (COM CORREÇÃO DE ZOOM/PAN E NÉVOA) ---
 async function fazerUploadMapa() {
   if (!supabaseClient) return alert('Supabase não conectado.');
   const input = document.getElementById('arquivo-mapa');
@@ -488,7 +488,6 @@ function exibirMapaNaTela(url) {
   configurarPanMapa();
 }
 
-// Configura o arrasto (Pan) do mapa e o clique de ferramentas do Mestre
 function configurarPanMapa() {
   const canvas = document.getElementById('vtt-canvas');
   if (!canvas) return;
@@ -553,7 +552,7 @@ function configurarPanMapa() {
   window.addEventListener('touchend', pararPan);
 }
 
-// --- FUNÇÕES DA NÉVOA DE GUERRA (FOG OF WAR) ---
+// --- NÉVOA DE GUERRA (FOG OF WAR CORRIGIDO) ---
 function alternarModoFog() {
   if (!ehMestreGlobal) return;
   fogAtivo = !fogAtivo;
@@ -574,16 +573,17 @@ function alternarModoFog() {
 function gerenciarCliqueFog(event) {
   if (!ehMestreGlobal || !fogAtivo) return;
   
-  const canvas = document.getElementById('vtt-canvas');
-  if (!canvas) return;
-  const rect = canvas.getBoundingClientRect();
+  const scaler = document.getElementById('vtt-mapa-scaler');
+  if (!scaler) return;
   
+  const rect = scaler.getBoundingClientRect();
   const clientX = event.clientX || event.touches?.[0]?.clientX;
   const clientY = event.clientY || event.touches?.[0]?.clientY;
   if (!clientX || !clientY) return;
 
-  const xRel = clientX - rect.left;
-  const yRel = clientY - rect.top;
+  const scale = (vttZoom || 100) / 100;
+  const xRel = (clientX - rect.left) / scale;
+  const yRel = (clientY - rect.top) / scale;
   
   const celX = Math.floor(xRel / vttGridTamanho);
   const celY = Math.floor(yRel / vttGridTamanho);
@@ -723,7 +723,7 @@ function criarEfeitoPing(x, y) {
   setTimeout(() => ping.remove(), 1000);
 }
 
-// --- MODAL DE CONFIGURAÇÃO DE TOKEN ---
+// --- CONFIGURAÇÃO DE TOKEN ---
 async function abrirModalConfigToken() {
   let modal = document.getElementById('modal-config-token');
   if (!modal) {
@@ -1153,7 +1153,7 @@ function abrirVisualizadorImagem(url, categoria) {
   modal.style.display = 'flex';
 }
 
-// --- SISTEMA DE TOASTS ---
+// --- SISTEMA DE NOTIFICAÇÕES (TOASTS) ---
 function mostrarPopup(texto) {
   let container = document.getElementById('toast-container');
   if (!container) {
@@ -1175,9 +1175,7 @@ function mostrarPopup(texto) {
   }, 3500);
 }
 
-// ==========================================
-// EXPORTAÇÕES GLOBAIS
-// ==========================================
+// --- EXPORTAÇÕES GLOBAIS DA WINDOW ---
 window.fazerLogin = fazerLogin;
 window.fazerCadastro = fazerCadastro;
 window.fazerLogout = fazerLogout;

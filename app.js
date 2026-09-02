@@ -1,5 +1,5 @@
 // ==========================================
-// CRÔNICAS DE CAMELOT - APP.JS COMPLETO E ATUALIZADO (TAMANHO DE TOKEN & AVATAR DA GALERIA)
+// CRÔNICAS DE CAMELOT - APP.JS COMPLETO E ATUALIZADO (MAPA & TOKENS CORRIGIDOS)
 // ==========================================
 
 const SUPABASE_URL = 'https://rolrbrtpqbchyxmjmvzr.supabase.co';
@@ -565,7 +565,7 @@ function configurarPanMapa() {
   let inicioY = 0;
 
   const iniciarPan = (e) => {
-    if (e.target.classList.contains('vtt-token')) return;
+    if (e.target.closest('.vtt-token')) return;
     
     if (ehMestreGlobal && vttMovimentoLivre) {
       estaMovendoMapa = true;
@@ -605,12 +605,12 @@ function configurarPanMapa() {
   };
 
   canvas.onmousedown = iniciarPan;
-  window.onmousemove = moverPan;
-  window.onmouseup = pararPan;
-
   canvas.ontouchstart = iniciarPan;
-  window.ontouchmove = moverPan;
-  window.ontouchend = pararPan;
+
+  window.addEventListener('mousemove', moverPan);
+  window.addEventListener('mouseup', pararPan);
+  window.addEventListener('touchmove', moverPan);
+  window.addEventListener('touchend', pararPan);
 }
 
 function alternarMovimentoMapa() {
@@ -888,12 +888,12 @@ function ativarArrastoToken(token, id, nome, tamanho, imagem) {
   };
 
   token.onmousedown = iniciarArrasto;
-  window.onmousemove = mover;
-  window.onmouseup = pararArrasto;
-
   token.ontouchstart = iniciarArrasto;
-  window.ontouchmove = mover;
-  window.ontouchend = pararArrasto;
+
+  window.addEventListener('mousemove', mover);
+  window.addEventListener('mouseup', pararArrasto);
+  window.addEventListener('touchmove', mover);
+  window.addEventListener('touchend', pararArrasto);
 }
 
 // --- ROLAGENS DE DADOS ---
@@ -1127,7 +1127,7 @@ window.fazerUploadMapa = fazerUploadMapa;
 window.alternarGridVTT = alternarGridVTT;
 window.alterarZoomMaster = alterarZoomMaster;
 window.atualizarTransformMapaVTT = atualizarTransformMapaVTT;
-window.ajustarGridTamanhoVTT =ajustarGridTamanhoVTT;
+window.ajustarGridTamanhoVTT = ajustarGridTamanhoVTT;
 window.darPingNoMapa = darPingNoMapa;
 window.abrirModalConfigToken = abrirModalConfigToken;
 window.selecionarImgToken = selecionarImgToken;

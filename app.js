@@ -1,5 +1,5 @@
 // ==========================================
-// CRÔNICAS DE CAMELOT - APP.JS (COMPLETO E ATUALIZADO)
+// CRÔNICAS DE CAMELOT - APP.JS (CORRIGIDO E OTIMIZADO)
 // ==========================================
 
 const SUPABASE_URL = 'https://rolrbrtpqbchyxmjmvzr.supabase.co';
@@ -13,14 +13,12 @@ let vttZoom = 100;
 let vttGridTamanho = 40;
 let ehMestreGlobal = false;
 
-// Controle de Posição (Pan), Cadeado e Névoa de Guerra (Fog of War)
+// Variáveis de controle de Posição (Pan) e Cadeado do Mapa
 let vttPanX = 0;
 let vttPanY = 0;
 let vttMovimentoLivre = false;
-let fogAtivo = false;
-let fogReveladoCelulas = new Set();
 
-// Inicialização segura do Supabase
+// Inicialização segura
 try {
   if (window.supabase) {
     supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -76,10 +74,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             payload.payload.hpMax ?? 50, 
             false
           );
-        })
-        .on('broadcast', { event: 'vtt_atualizar_fog' }, (payload) => {
-          fogReveladoCelulas = new Set(payload.payload.celulas);
-          atualizarCamadaFogVisual();
         })
         .subscribe();
 
@@ -394,7 +388,7 @@ function fecharModalFichaGrupo() {
   if (modalGrupo) modalGrupo.style.display = 'none';
 }
 
-// --- MAPA E MINI-VTT (COM CORREÇÃO DE ZOOM/PAN E NÉVOA) ---
+// --- MAPA E MINI-VTT (OTIMIZADO PARA MOBILE) ---
 async function fazerUploadMapa() {
   if (!supabaseClient) return alert('Supabase não conectado.');
   const input = document.getElementById('arquivo-mapa');
@@ -436,7 +430,6 @@ function exibirMapaNaTela(url) {
   if (!container) return;
 
   let zoomControlHTML = '';
-  
   if (ehMestreGlobal) {
     zoomControlHTML = `
       <div style="display: flex; align-items: center; gap: 6px; color: #fff; font-size: 0.85rem;">
@@ -446,9 +439,6 @@ function exibirMapaNaTela(url) {
       </div>
       <button id="btn-cadeado-vtt" onclick="alternarMovimentoMapa()" style="background: ${vttMovimentoLivre ? '#04d361' : '#29292e'}; color: #fff; border: 1px solid #4a3d24; padding: 0.3rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">
         ${vttMovimentoLivre ? '🔓 Desbloqueado' : '🔒 Travado'}
-      </button>
-      <button onclick="alternarModoFog()" id="btn-fog-vtt" style="background: ${fogAtivo ? '#ff5252' : '#29292e'}; color: #fff; border: 1px solid #4a3d24; padding: 0.3rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">
-        ${fogAtivo ? '👁️ Fog: Pintando' : '👁️ Fog: Desativado'}
       </button>
     `;
   } else {
@@ -474,20 +464,19 @@ function exibirMapaNaTela(url) {
       </div>
     </div>
     
-    <div id="vtt-canvas" class="vtt-wrapper" style="overflow: hidden; position: relative; width: 100%; height: 55vh; border: 1px solid #29292e; border-radius: 6px; background: #0b0d12; display: flex; justify-content: center; align-items: center; touch-action: none; cursor: ${ehMestreGlobal && fogAtivo ? 'cell' : (ehMestreGlobal && vttMovimentoLivre ? 'grab' : 'crosshair')};">
+    <div id="vtt-canvas" class="vtt-wrapper" style="overflow: hidden; position: relative; width: 100%; height: 55vh; border: 1px solid #29292e; border-radius: 6px; background: #0b0d12; display: flex; justify-content: center; align-items: center; touch-action: none; cursor: ${ehMestreGlobal && vttMovimentoLivre ? 'grab' : 'crosshair'};">
       <div id="vtt-mapa-scaler" style="position: relative; width: 100%; transform: translate(${vttPanX}px, ${vttPanY}px) scale(${vttZoom / 100}); transform-origin: center center; transition: transform 0.05s ease-out; display: flex; justify-content: center; align-items: center;">
         <img src="${url}" class="vtt-mapa-img" alt="Mapa Tático" style="width: 100%; display: block; height: auto; pointer-events: none;">
         <div id="vtt-grid-camada" class="vtt-grid ${gridAtivo ? 'ativo' : ''}" style="background-size: ${vttGridTamanho}px ${vttGridTamanho}px; position: absolute; top:0; left:0; width:100%; height:100%; pointer-events: none;"></div>
-        <div id="vtt-fog-camada" style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events: none;"></div>
         <div id="vtt-tokens-camada" style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events: none;"></div>
       </div>
     </div>
   `;
 
-  atualizarCamadaFogVisual();
   configurarPanMapa();
 }
 
+// Configura o arrasto (Pan) do mapa para o Mestre quando destravado
 function configurarPanMapa() {
   const canvas = document.getElementById('vtt-canvas');
   if (!canvas) return;
@@ -499,12 +488,6 @@ function configurarPanMapa() {
   const iniciarPan = (e) => {
     if (e.target.closest('.vtt-token')) return;
     
-    if (ehMestreGlobal && fogAtivo) {
-      gerenciarCliqueFog(e);
-      e.preventDefault();
-      return;
-    }
-
     if (ehMestreGlobal && vttMovimentoLivre) {
       estaMovendoMapa = true;
       inicioX = (e.clientX || e.touches?.[0].clientX) - vttPanX;
@@ -531,7 +514,7 @@ function configurarPanMapa() {
   const pararPan = () => {
     if (estaMovendoMapa) {
       estaMovendoMapa = false;
-      if (canvas) canvas.style.cursor = fogAtivo ? 'cell' : (vttMovimentoLivre ? 'grab' : 'crosshair');
+      if (canvas) canvas.style.cursor = 'grab';
       
       if (canalMesa && ehMestreGlobal) {
         canalMesa.send({
@@ -552,79 +535,6 @@ function configurarPanMapa() {
   window.addEventListener('touchend', pararPan);
 }
 
-// --- NÉVOA DE GUERRA (FOG OF WAR CORRIGIDO) ---
-function alternarModoFog() {
-  if (!ehMestreGlobal) return;
-  fogAtivo = !fogAtivo;
-  
-  const btn = document.getElementById('btn-fog-vtt');
-  if (btn) {
-    btn.style.background = fogAtivo ? '#ff5252' : '#29292e';
-    btn.innerText = fogAtivo ? '👁️ Fog: Pintando' : '👁️ Fog: Desativado';
-  }
-  
-  const canvas = document.getElementById('vtt-canvas');
-  if (canvas) {
-    canvas.style.cursor = fogAtivo ? 'cell' : (vttMovimentoLivre ? 'grab' : 'crosshair');
-  }
-  mostrarPopup(fogAtivo ? '👁️ Modo Névoa de Guerra ativado (Clique para revelar áreas).' : '👁️ Modo Névoa desativado.');
-}
-
-function gerenciarCliqueFog(event) {
-  if (!ehMestreGlobal || !fogAtivo) return;
-  
-  const scaler = document.getElementById('vtt-mapa-scaler');
-  if (!scaler) return;
-  
-  const rect = scaler.getBoundingClientRect();
-  const clientX = event.clientX || event.touches?.[0]?.clientX;
-  const clientY = event.clientY || event.touches?.[0]?.clientY;
-  if (!clientX || !clientY) return;
-
-  const scale = (vttZoom || 100) / 100;
-  const xRel = (clientX - rect.left) / scale;
-  const yRel = (clientY - rect.top) / scale;
-  
-  const celX = Math.floor(xRel / vttGridTamanho);
-  const celY = Math.floor(yRel / vttGridTamanho);
-  const chaveCel = `${celX}_${celY}`;
-
-  if (fogReveladoCelulas.has(chaveCel)) {
-    fogReveladoCelulas.delete(chaveCel);
-  } else {
-    fogReveladoCelulas.add(chaveCel);
-  }
-
-  atualizarCamadaFogVisual();
-
-  if (canalMesa) {
-    canalMesa.send({
-      type: 'broadcast',
-      event: 'vtt_atualizar_fog',
-      payload: { celulas: Array.from(fogReveladoCelulas) }
-    });
-  }
-}
-
-function atualizarCamadaFogVisual() {
-  const fogCamada = document.getElementById('vtt-fog-camada');
-  if (!fogCamada) return;
-
-  let svgContent = `<svg width="100%" height="100%" style="position:absolute; top:0; left:0; pointer-events:none;">`;
-  svgContent += `<defs><mask id="mask-fog"><rect width="100%" height="100%" fill="white"/>`;
-  
-  fogReveladoCelulas.forEach(cel => {
-    const [cx, cy] = cel.split('_').map(Number);
-    svgContent += `<rect x="${cx * vttGridTamanho}" y="${cy * vttGridTamanho}" width="${vttGridTamanho}" height="${vttGridTamanho}" fill="black"/>`;
-  });
-  
-  svgContent += `</mask></defs>`;
-  svgContent += `<rect width="100%" height="100%" fill="rgba(0, 0, 0, 0.88)" mask="url(#mask-fog)"/>`;
-  svgContent += `</svg>`;
-
-  fogCamada.innerHTML = svgContent;
-}
-
 function alternarMovimentoMapa() {
   if (!ehMestreGlobal) return;
   vttMovimentoLivre = !vttMovimentoLivre;
@@ -637,7 +547,7 @@ function alternarMovimentoMapa() {
     btn.innerText = vttMovimentoLivre ? '🔓 Desbloqueado' : '🔒 Travado';
   }
   if (canvas) {
-    canvas.style.cursor = fogAtivo ? 'cell' : (vttMovimentoLivre ? 'grab' : 'crosshair');
+    canvas.style.cursor = vttMovimentoLivre ? 'grab' : 'crosshair';
   }
   mostrarPopup(vttMovimentoLivre ? '🔓 Mapa destravado!' : '🔒 Mapa travado.');
 }
@@ -683,11 +593,10 @@ function ajustarGridTamanhoVTT(valor) {
   if (gridDiv) {
     gridDiv.style.backgroundSize = `${vttGridTamanho}px ${vttGridTamanho}px`;
   }
-  atualizarCamadaFogVisual();
 }
 
 function darPingNoMapa(event) {
-  if (event.target.classList.contains('vtt-token') || vttMovimentoLivre || fogAtivo) return;
+  if (event.target.classList.contains('vtt-token') || vttMovimentoLivre) return;
 
   const canvas = document.getElementById('vtt-canvas');
   if (!canvas) return;
@@ -723,7 +632,7 @@ function criarEfeitoPing(x, y) {
   setTimeout(() => ping.remove(), 1000);
 }
 
-// --- CONFIGURAÇÃO DE TOKEN ---
+// --- MODAL DE CONFIGURAÇÃO DE TOKEN ---
 async function abrirModalConfigToken() {
   let modal = document.getElementById('modal-config-token');
   if (!modal) {
@@ -1153,7 +1062,7 @@ function abrirVisualizadorImagem(url, categoria) {
   modal.style.display = 'flex';
 }
 
-// --- SISTEMA DE NOTIFICAÇÕES (TOASTS) ---
+// --- SISTEMA DE TOASTS ---
 function mostrarPopup(texto) {
   let container = document.getElementById('toast-container');
   if (!container) {
@@ -1175,7 +1084,9 @@ function mostrarPopup(texto) {
   }, 3500);
 }
 
-// --- EXPORTAÇÕES GLOBAIS DA WINDOW ---
+// ==========================================
+// EXPORTAÇÕES GLOBAIS
+// ==========================================
 window.fazerLogin = fazerLogin;
 window.fazerCadastro = fazerCadastro;
 window.fazerLogout = fazerLogout;
@@ -1198,4 +1109,3 @@ window.rolarDado = rolarDado;
 window.rolarExpressaoPersonalizada = rolarExpressaoPersonalizada;
 window.fazerUploadImagem = fazerUploadImagem;
 window.alternarMovimentoMapa = alternarMovimentoMapa;
-window.alternarModoFog = alternarModoFog;

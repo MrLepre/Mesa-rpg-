@@ -8,7 +8,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-  <!-- Container da interface superior para permitir occultação/expansão -->
+  <!-- Container da interface superior -->
   <div id="topo-geral">
     <header class="topo-mesa">
       <h1>Mesa Virtual - Crônicas de Camelot</h1>
@@ -37,6 +37,7 @@
   </div>
 
   <main>
+    <!-- ABA FICHA -->
     <section id="aba-ficha" class="painel ativo">
       <h2>Minha Ficha do Personagem</h2>
       <div class="card-secao">
@@ -53,6 +54,7 @@
       </div>
     </section>
 
+    <!-- ABA GRUPO -->
     <section id="aba-grupo" class="painel">
       <h2>Fichas dos Cavaleiros da Távola</h2>
       <button onclick="carregarFichasDoGrupo()" style="background: #8257e5; color: #fff; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; margin-bottom: 15px;">Atualizar Lista do Grupo</button>
@@ -61,6 +63,7 @@
       </div>
     </section>
 
+    <!-- ABA MAPA (VTT) -->
     <section id="aba-mapa" class="painel">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
         <h2 style="margin: 0;">Mapa Tático e Mini-VTT</h2>
@@ -69,7 +72,6 @@
         </button>
       </div>
 
-      <!-- Painel retrátil usando a tag <details> -->
       <details id="painel-upload-mestre" style="display: none; background: #202024; padding: 10px 15px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #c5a059;">
         <summary style="color: #c5a059; font-weight: bold; cursor: pointer; font-size: 0.95rem; user-select: none;">
           👑 Painel do Mestre: Enviar Novo Mapa (clique para recolher/expandir)
@@ -85,6 +87,7 @@
       </div>
     </section>
 
+    <!-- ABA ROLAGENS -->
     <section id="aba-rolagens" class="painel">
       <h2>Salão de Rolagens de Dados</h2>
       <div style="background: #202024; padding: 15px; border-radius: 6px; margin-bottom: 15px;">
@@ -114,6 +117,7 @@
       </div>
     </section>
 
+    <!-- ABA GALERIA -->
     <section id="aba-galeria" class="painel">
       <h2>Galeria e Recursos Visuais</h2>
       <div style="background: #202024; padding: 15px; border-radius: 6px; margin-bottom: 15px;">
@@ -137,6 +141,7 @@
     </section>
   </main>
 
+  <!-- MODAL FICHA DO GRUPO -->
   <div id="modal-ficha-grupo" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 9998; justify-content: center; align-items: center; padding: 20px;">
     <div style="background: #121214; width: 100%; max-width: 700px; border-radius: 6px; border: 2px solid #c5a059; overflow: hidden; display: flex; flex-direction: column;">
       <div style="background: #1a1d26; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #c5a059;">

@@ -1,5 +1,5 @@
 // ==========================================
-// CRÔNICAS DE CAMELOT - APP.JS COMPLETO E ATUALIZADO
+// CRÔNICAS DE CAMELOT - APP.JS COMPLETO E GLOBAL
 // ==========================================
 
 const SUPABASE_URL = 'https://rolrbrtpqbchyxmjmvzr.supabase.co';
@@ -9,7 +9,6 @@ let supabaseClient = null;
 let dadosFichaAtual = null; 
 let canalMesa = null;
 let gridAtivo = false;
-let vttGridTamanho = 40;
 
 // Inicialização segura
 try {
@@ -224,16 +223,11 @@ async function salvarFichaNoSupabase() {
 
 async function carregarFichaDoUsuario(userId) {
   if (!supabaseClient) return;
-  const { data, error } = await supabaseClient
+  const { data } = await supabaseClient
     .from('fichas')
     .select('*')
     .eq('user_id', userId)
-    .maybeSingle();
-
-  if (error) {
-    console.warn('Aviso ao carregar ficha:', error.message);
-    return;
-  }
+    .single();
 
   if (data && data.dados_ficha) {
     dadosFichaAtual = data.dados_ficha;
@@ -493,25 +487,15 @@ function exibirMapaNaTela(url) {
   if (!container) return;
 
   container.innerHTML = `
-    <div style="margin-bottom: 12px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; background: #18181b; padding: 10px; border-radius: 6px; border: 1px solid #29292e;">
+    <div style="margin-bottom: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
       <button onclick="alternarGridVTT()">🗺️ Alternar Grelha</button>
       <button onclick="adicionarTokenMesa()">🛡️ Meu Token</button>
-
-      <div style="display: flex; align-items: center; gap: 6px; color: #fff; font-size: 0.85rem;">
-        <span>Tamanho do Grid:</span>
-        <input type="range" min="20" max="100" value="${vttGridTamanho}" oninput="ajustarGridTamanhoVTT(this.value)" style="width: 90px; cursor: pointer;">
-        <span id="grid-size-label" style="min-width: 35px; color: #f3d075;">${vttGridTamanho}px</span>
-      </div>
-
-      <span style="font-size: 0.85rem; color: var(--cam-gold-light); width: 100%; margin-top: 4px;">* Clique no mapa para dar Ping / Arraste seu token</span>
+      <span style="font-size: 0.9rem; color: var(--cam-gold-light);">* Clique no mapa para dar Ping / Arraste seu token</span>
     </div>
-    
-    <div id="vtt-canvas" class="vtt-wrapper" onclick="darPingNoMapa(event)" style="overflow: auto; position: relative; max-height: 65vh; border: 1px solid #29292e; border-radius: 6px; background: #0b0d12;">
-      <div id="vtt-mapa-scaler" style="position: relative; width: 100%;">
-        <img src="${url}" class="vtt-mapa-img" alt="Mapa Tático de Camelot" style="width: 100%; display: block; height: auto;">
-        <div id="vtt-grid-camada" class="vtt-grid ${gridAtivo ? 'ativo' : ''}" style="background-size: ${vttGridTamanho}px ${vttGridTamanho}px; position: absolute; top:0; left:0; width:100%; height:100%;"></div>
-        <div id="vtt-tokens-camada" style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;"></div>
-      </div>
+    <div id="vtt-canvas" class="vtt-wrapper" onclick="darPingNoMapa(event)">
+      <img src="${url}" class="vtt-mapa-img" alt="Mapa Tático de Camelot">
+      <div id="vtt-grid-camada" class="vtt-grid ${gridAtivo ? 'ativo' : ''}"></div>
+      <div id="vtt-tokens-camada" style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;"></div>
     </div>
   `;
 }
@@ -521,17 +505,6 @@ function alternarGridVTT() {
   const gridDiv = document.getElementById('vtt-grid-camada');
   if (gridDiv) {
     gridDiv.classList.toggle('ativo', gridAtivo);
-  }
-}
-
-function ajustarGridTamanhoVTT(valor) {
-  vttGridTamanho = parseInt(valor);
-  const label = document.getElementById('grid-size-label');
-  if (label) label.innerText = `${vttGridTamanho}px`;
-
-  const gridDiv = document.getElementById('vtt-grid-camada');
-  if (gridDiv) {
-    gridDiv.style.backgroundSize = `${vttGridTamanho}px ${vttGridTamanho}px`;
   }
 }
 
@@ -889,7 +862,6 @@ window.abrirFichaGrupo = abrirFichaGrupo;
 window.fecharModalFichaGrupo = fecharModalFichaGrupo;
 window.fazerUploadMapa = fazerUploadMapa;
 window.alternarGridVTT = alternarGridVTT;
-window.ajustarGridTamanhoVTT = ajustarGridTamanhoVTT;
 window.darPingNoMapa = darPingNoMapa;
 window.adicionarTokenMesa = adicionarTokenMesa;
 window.rolarDado = rolarDado;

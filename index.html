@@ -65,9 +65,8 @@
         <input type="file" id="arquivo-mapa" accept="image/*" style="margin-bottom: 10px; display: block;">
         <button onclick="fazerUploadMapa()" style="background: #c5a059; color: #121214; font-weight: bold; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer;">Publicar Mapa para o Grupo</button>
       </div>
-      <div id="container-mapa" style="background: #050505; border: 1px solid #333; border-radius: 6px; padding: 10px; min-height: 400px; display: flex; justify-content: center; align-items: center; overflow: auto;">
-        <p id="msg-sem-mapa" style="color: #a8a8b3;">Nenhum mapa carregado no momento.</p>
-        <img id="mapa-img" src="" alt="Mapa Tático" style="display: none; max-width: 100%; height: auto;">
+      <div id="container-mapa">
+        <p style="color: #a8a8b3;">Nenhum mapa carregado no momento.</p>
       </div>
     </section>
 
@@ -116,8 +115,8 @@
       </div>
       <div>
         <h3>Galeria Geral</h3>
-        <div id="galeria-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 15px; margin-top: 15px;">
-          <p style="color: #a8a8b3;">Nenhuma imagem enviada ainda.</p>
+        <div id="galeria-grid">
+          <p style="color: #a8a8b3;">Carregando galeria...</p>
         </div>
       </div>
     </section>

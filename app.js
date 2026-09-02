@@ -1,5 +1,5 @@
 // ==========================================
-// CRÔNICAS DE CAMELOT - APP.JS COMPLETO E ATUALIZADO (COM PAN & ZOOM LIVRE / CADEADO)
+// CRÔNICAS DE CAMELOT - APP.JS COMPLETO E ATUALIZADO (TAMANHO DE TOKEN & AVATAR DA GALERIA)
 // ==========================================
 
 const SUPABASE_URL = 'https://rolrbrtpqbchyxmjmvzr.supabase.co';
@@ -13,10 +13,10 @@ let vttZoom = 100;
 let vttGridTamanho = 40;
 let ehMestreGlobal = false;
 
-// Novas variáveis para controle de Posição (Pan) e Cadeado do Mapa
+// Variáveis de controle de Posição (Pan) e Cadeado do Mapa
 let vttPanX = 0;
 let vttPanY = 0;
-let vttMovimentoLivre = false; // Controlado pelo cadeado do Mestre
+let vttMovimentoLivre = false;
 
 // Inicialização segura
 try {
@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           criarEfeitoPing(payload.payload.x, payload.payload.y);
         })
         .on('broadcast', { event: 'vtt_mover_token' }, (payload) => {
-          criarElementoToken(payload.payload.id, payload.payload.nome, payload.payload.x, payload.payload.y, false);
+          criarElementoToken(payload.payload.id, payload.payload.nome, payload.payload.x, payload.payload.y, payload.payload.tamanho || 45, payload.payload.imagem || '', false);
         })
         .subscribe();
 
@@ -530,7 +530,7 @@ function exibirMapaNaTela(url) {
   container.innerHTML = `
     <div style="margin-bottom: 12px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; background: #18181b; padding: 10px; border-radius: 6px; border: 1px solid #29292e;">
       <button onclick="alternarGridVTT()">🗺️ Alternar Grelha</button>
-      <button onclick="adicionarTokenMesa()">🛡️ Meu Token</button>
+      <button onclick="abrirModalConfigToken()">🛡️ Meu Token</button>
 
       ${zoomControlHTML}
 
@@ -565,7 +565,6 @@ function configurarPanMapa() {
   let inicioY = 0;
 
   const iniciarPan = (e) => {
-    // Se for clique em token ou se o cadeado estiver travado, ignora o pan do mapa e trata clique normal (Ping)
     if (e.target.classList.contains('vtt-token')) return;
     
     if (ehMestreGlobal && vttMovimentoLivre) {
@@ -575,7 +574,6 @@ function configurarPanMapa() {
       canvas.style.cursor = 'grabbing';
       e.preventDefault();
     } else {
-      // Comportamento normal de Ping se travado
       darPingNoMapa(e);
     }
   };
@@ -596,7 +594,6 @@ function configurarPanMapa() {
       estaMovendoMapa = false;
       if (canvas) canvas.style.cursor = 'grab';
       
-      // Sincronizar com os jogadores via broadcast
       if (canalMesa && ehMestreGlobal) {
         canalMesa.send({
           type: 'broadcast',
@@ -709,28 +706,100 @@ function criarEfeitoPing(x, y) {
   setTimeout(() => ping.remove(), 1000);
 }
 
-function adicionarTokenMesa() {
-  const userNick = document.getElementById('user-nick-display')?.innerText || document.getElementById('auth-nick')?.value || 'Cavaleiro';
-  const tokenID = 'token_' + (userNick.toLowerCase().replace(/[^a-z0-9]/g, '_'));
-  
-  if (document.getElementById(tokenID)) {
-    mostrarPopup('Seu token já está na mesa, cavaleiro!');
-    return;
+// --- MODAL DE CONFIGURAÇÃO DE TOKEN (TAMANHO E IMAGEM) ---
+async function abrirModalConfigToken() {
+  let modal = document.getElementById('modal-config-token');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modal-config-token';
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 9999; padding: 20px;';
+    document.body.appendChild(modal);
   }
 
-  criarElementoToken(tokenID, userNick, 10, 10, true);
+  let imagensHtml = '<p style="color: #a8a8b3; font-size: 0.9rem;">Carregando galeria...</p>';
+  if (supabaseClient) {
+    const { data } = await supabaseClient.from('galeria_imagens').select('*').order('criado_em', { ascending: false });
+    if (data && data.length > 0) {
+      imagensHtml = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 8px; max-height: 160px; overflow-y: auto; background: #0b0d12; padding: 8px; border-radius: 4px; border: 1px solid #29292e;">
+          ${data.map(img => `
+            <div class="opcao-img-token" onclick="selecionarImgToken('${img.url}', this)" style="cursor: pointer; border: 2px solid transparent; border-radius: 4px; overflow: hidden; height: 60px;">
+              <img src="${img.url}" style="width: 100%; height: 100%; object-fit: cover;">
+            </div>
+          `).join('')}
+        </div>
+      `;
+    } else {
+      imagensHtml = '<p style="color: #a8a8b3; font-size: 0.9rem;">Nenhuma imagem na galeria ainda.</p>';
+    }
+  }
+
+  modal.innerHTML = `
+    <div style="background: #151821; border: 2px solid #8257e5; padding: 20px; border-radius: 8px; width: 420px; max-width: 90%; color: #fff; font-family: 'EB Garamond', serif;">
+      <h3 style="color: #f3d075; font-family: 'Cinzel', serif; margin-bottom: 15px; text-align: center;">Configurar Meu Token</h3>
+      
+      <div style="margin-bottom: 12px;">
+        <label style="display: block; font-size: 0.9rem; color: #e6ca88; margin-bottom: 5px;">Tamanho do Token:</label>
+        <select id="token-tamanho-select" style="width: 100%; padding: 8px; background: #0b0d12; color: #fff; border: 1px solid #4a3d24; border-radius: 4px;">
+          <option value="35">Pequeno (35px)</option>
+          <option value="45" selected>Padrão (45px)</option>
+          <option value="65">Médio / Grande (65px)</option>
+          <option value="90">Gigante (90px)</option>
+        </select>
+      </div>
+
+      <div style="margin-bottom: 12px;">
+        <label style="display: block; font-size: 0.9rem; color: #e6ca88; margin-bottom: 5px;">Escolher Imagem da Galeria:</label>
+        <input type="hidden" id="token-url-escolhida" value="">
+        ${imagensHtml}
+      </div>
+
+      <div style="margin-bottom: 15px;">
+        <label style="display: block; font-size: 0.9rem; color: #e6ca88; margin-bottom: 5px;">Ou cole o Link Direto da Imagem:</label>
+        <input type="text" id="token-url-input" placeholder="https://exemplo.com/imagem.png" oninput="document.getElementById('token-url-escolhida').value=this.value" style="width: 100%; padding: 8px; background: #0b0d12; color: #fff; border: 1px solid #4a3d24; border-radius: 4px; font-size: 0.85rem;">
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end;">
+        <button onclick="document.getElementById('modal-config-token').style.display='none'" style="background: #29292e; color: #fff; border: none; padding: 8px 14px; border-radius: 4px; cursor: pointer;">Cancelar</button>
+        <button onclick="confirmarCriacaoToken()" style="background: #8257e5; color: #fff; border: none; padding: 8px 14px; border-radius: 4px; cursor: pointer; font-weight: bold;">Salvar e Posicionar</button>
+      </div>
+    </div>
+  `;
+  modal.style.display = 'flex';
+}
+
+function selecionarImgToken(url, elem) {
+  document.querySelectorAll('.opcao-img-token').forEach(el => el.style.border = '2px solid transparent');
+  elem.style.border = '2px solid #04d361';
+  document.getElementById('token-url-escolhida').value = url;
+  document.getElementById('token-url-input').value = url;
+}
+
+function confirmarCriacaoToken() {
+  const tamanho = parseInt(document.getElementById('token-tamanho-select').value) || 45;
+  const imagem = document.getElementById('token-url-escolhida').value.trim();
+  document.getElementById('modal-config-token').style.display = 'none';
+  
+  executarAdicionarTokenMesa(tamanho, imagem);
+}
+
+function executarAdicionarTokenMesa(tamanho = 45, imagem = '') {
+  const userNick = document.getElementById('user-nick-display')?.innerText || document.getElementById('auth-nick')?.value || 'Cavaleiro';
+  const tokenID = 'token_' + (userNick.toLowerCase().replace(/[^a-z0-9]/g, '_'));
+
+  criarElementoToken(tokenID, userNick, 10, 10, tamanho, imagem, true);
   
   if (canalMesa) {
     canalMesa.send({
       type: 'broadcast',
       event: 'vtt_mover_token',
-      payload: { id: tokenID, nome: userNick, x: 10, y: 10 }
+      payload: { id: tokenID, nome: userNick, x: 10, y: 10, tamanho, imagem }
     });
   }
   mostrarPopup('🛡️ Token posicionado na Távola!');
 }
 
-function criarElementoToken(id, nome, x, y, ehMeu = false) {
+function criarElementoToken(id, nome, x, y, tamanho = 45, imagem = '', ehMeu = false) {
   let camada = document.getElementById('vtt-tokens-camada');
   if (!camada) return;
 
@@ -739,9 +808,35 @@ function criarElementoToken(id, nome, x, y, ehMeu = false) {
     token = document.createElement('div');
     token.id = id;
     token.className = 'vtt-token';
-    token.innerText = nome.substring(0, 3).toUpperCase();
     token.title = nome;
     camada.appendChild(token);
+  }
+
+  token.style.width = `${tamanho}px`;
+  token.style.height = `${tamanho}px`;
+  token.style.borderRadius = '50%';
+  token.style.position = 'absolute';
+  token.style.transform = 'translate(-50%, -50%)';
+  token.style.cursor = 'pointer';
+  token.style.boxShadow = '0 2px 6px rgba(0,0,0,0.6)';
+  token.style.border = '2px solid #f3d075';
+  token.style.display = 'flex';
+  token.style.alignItems = 'center';
+  token.style.justifyContent = 'center';
+  token.style.fontWeight = 'bold';
+  token.style.fontSize = '0.75rem';
+  token.style.color = '#fff';
+  token.style.overflow = 'hidden';
+
+  if (imagem) {
+    token.style.backgroundImage = `url(${imagem})`;
+    token.style.backgroundSize = 'cover';
+    token.style.backgroundPosition = 'center';
+    token.innerText = '';
+  } else {
+    token.style.backgroundImage = 'none';
+    token.style.backgroundColor = '#202024';
+    token.innerText = nome.substring(0, 3).toUpperCase();
   }
 
   token.style.left = `${x}%`;
@@ -749,11 +844,11 @@ function criarElementoToken(id, nome, x, y, ehMeu = false) {
   token.style.pointerEvents = 'auto';
 
   if (ehMeu) {
-    ativarArrastoToken(token, id, nome);
+    ativarArrastoToken(token, id, nome, tamanho, imagem);
   }
 }
 
-function ativarArrastoToken(token, id, nome) {
+function ativarArrastoToken(token, id, nome, tamanho, imagem) {
   let arrastando = false;
 
   const iniciarArrasto = (e) => {
@@ -773,8 +868,8 @@ function ativarArrastoToken(token, id, nome) {
     let x = ((clientX - rect.left) / rect.width) * 100;
     let y = ((clientY - rect.top) / rect.height) * 100;
 
-    x = Math.max(0, Math.min(95, x));
-    y = Math.max(0, Math.min(95, y));
+    x = Math.max(0, Math.min(100, x));
+    y = Math.max(0, Math.min(100, y));
 
     token.style.left = `${x}%`;
     token.style.top = `${y}%`;
@@ -783,7 +878,7 @@ function ativarArrastoToken(token, id, nome) {
       canalMesa.send({
         type: 'broadcast',
         event: 'vtt_mover_token',
-        payload: { id, nome, x, y }
+        payload: { id, nome, x, y, tamanho, imagem }
       });
     }
   };
@@ -792,13 +887,13 @@ function ativarArrastoToken(token, id, nome) {
     arrastando = false;
   };
 
-  token.addEventListener('mousedown', iniciarArrasto);
-  window.addEventListener('mousemove', mover);
-  window.addEventListener('mouseup', pararArrasto);
+  token.onmousedown = iniciarArrasto;
+  window.onmousemove = mover;
+  window.onmouseup = pararArrasto;
 
-  token.addEventListener('touchstart', iniciarArrasto);
-  window.addEventListener('touchmove', mover);
-  window.addEventListener('touchend', pararArrasto);
+  token.ontouchstart = iniciarArrasto;
+  window.ontouchmove = mover;
+  window.ontouchend = pararArrasto;
 }
 
 // --- ROLAGENS DE DADOS ---
@@ -1032,9 +1127,11 @@ window.fazerUploadMapa = fazerUploadMapa;
 window.alternarGridVTT = alternarGridVTT;
 window.alterarZoomMaster = alterarZoomMaster;
 window.atualizarTransformMapaVTT = atualizarTransformMapaVTT;
-window.ajustarGridTamanhoVTT = ajustarGridTamanhoVTT;
+window.ajustarGridTamanhoVTT =ajustarGridTamanhoVTT;
 window.darPingNoMapa = darPingNoMapa;
-window.adicionarTokenMesa = adicionarTokenMesa;
+window.abrirModalConfigToken = abrirModalConfigToken;
+window.selecionarImgToken = selecionarImgToken;
+window.confirmarCriacaoToken = confirmarCriacaoToken;
 window.rolarDado = rolarDado;
 window.rolarExpressaoPersonalizada = rolarExpressaoPersonalizada;
 window.fazerUploadImagem = fazerUploadImagem;

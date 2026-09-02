@@ -1,5 +1,5 @@
 // ==========================================
-// CRÔNICAS DE CAMELOT - APP.JS (COM NÉVOA DE GUERRA)
+// CRÔNICAS DE CAMELOT - APP.JS (COMPLETO E INTEGRADO)
 // ==========================================
 
 const SUPABASE_URL = 'https://rolrbrtpqbchyxmjmvzr.supabase.co';
@@ -436,7 +436,6 @@ function exibirMapaNaTela(url) {
   if (!container) return;
 
   let zoomControlHTML = '';
-  let fogControlHTML = '';
   
   if (ehMestreGlobal) {
     zoomControlHTML = `

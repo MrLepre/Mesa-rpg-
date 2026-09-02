@@ -1,5 +1,5 @@
 // ==========================================
-// CRÔNICAS DE CAMELOT - APP.JS (OTIMIZADO PARA MOBILE E TOQUE)
+// CRÔNICAS DE CAMELOT - APP.JS (CORRIGIDO E OTIMIZADO)
 // ==========================================
 
 const SUPABASE_URL = 'https://rolrbrtpqbchyxmjmvzr.supabase.co';
@@ -28,7 +28,6 @@ try {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // Garante que o corpo da página não tenha overflow horizontal indesejado no mobile
   document.body.style.overflowX = 'hidden';
   document.body.style.touchAction = 'pan-y';
 
@@ -325,30 +324,6 @@ function abrirFichaGrupo(dados) {
   const tituloElem = document.getElementById('modal-titulo-personagem');
   if (tituloElem) tituloElem.innerText = dados.nome || dados.personagem_nome || 'Personagem';
   
-  const formatarValorOuObjeto = (val) => {
-    if (!val) return '-';
-    if (typeof val === 'object') {
-      return Object.entries(val).map(([k, v]) => `<strong>${k}:</strong> ${v}`).join(' | ');
-    }
-    return val;
-  };
-
-  const periciasHTML = dados.pericias || dados.grimorio_pericias ? (() => {
-    const periciasObj = dados.pericias || dados.grimorio_pericias;
-    if (typeof periciasObj === 'object') {
-      return Object.entries(periciasObj).map(([k, v]) => `<div style="background: #0b0d12; padding: 6px 10px; border: 1px solid #4a3d24; border-radius: 4px; font-size: 0.9rem;"><span style="color: #f3d075;">${k}:</span> ${v}</div>`).join('');
-    }
-    return `<div style="background: #0b0d12; padding: 6px 10px; border: 1px solid #4a3d24; border-radius: 4px;">${periciasObj}</div>`;
-  })() : '<span style="color: #a8a8b3;">Nenhuma perícia registrada.</span>';
-
-  const sinergiaHTML = dados.sinergia_elemental || dados.elementos ? (() => {
-    const elemObj = dados.sinergia_elemental || dados.elementos;
-    if (typeof elemObj === 'object') {
-      return Object.entries(elemObj).map(([k, v]) => `<div style="background: #0b0d12; padding: 6px; border: 1px solid #4a3d24; border-radius: 4px; text-align: center;"><span style="font-size: 0.75rem; color: #e6ca88; text-transform: uppercase;">${k}</span><br><strong style="font-size: 1.1rem;">${v}</strong></div>`).join('');
-    }
-    return '';
-  })() : '';
-
   const conteudoModal = document.getElementById('modal-conteudo-ficha');
   if (conteudoModal) {
     conteudoModal.innerHTML = `
@@ -784,7 +759,7 @@ function criarElementoToken(id, nome, x, y, tamanho = 45, imagem = '', hpAtual =
   token.style.fontSize = '0.75rem';
   token.style.color = '#fff';
   token.style.overflow = 'visible';
-  token.style.touchAction = 'none'; // Impede o navegador de dar scroll ao tocar no token
+  token.style.touchAction = 'none';
 
   if (imagem) {
     token.style.backgroundImage = `url(${imagem})`;
@@ -801,7 +776,6 @@ function criarElementoToken(id, nome, x, y, tamanho = 45, imagem = '', hpAtual =
   token.style.top = `${y}%`;
   token.style.pointerEvents = 'auto';
 
-  // Etiqueta de HP
   let hpTag = token.querySelector('.vtt-token-hp');
   if (!hpTag) {
     hpTag = document.createElement('div');
@@ -825,7 +799,7 @@ function ativarArrastoToken(token, id, nome, tamanho, imagem, hpAtual, hpMax) {
     arrastando = true;
     moveuDeFato = false;
     e.stopPropagation();
-    e.preventDefault(); // Evita scroll do celular
+    e.preventDefault();
   };
 
   const mover = (e) => {
@@ -854,12 +828,11 @@ function ativarArrastoToken(token, id, nome, tamanho, imagem, hpAtual, hpMax) {
         payload: { id, nome, x, y, tamanho, imagem, hpAtual, hpMax }
       });
     }
-    e.preventDefault(); // Crucial para o celular não mover a página junto
+    e.preventDefault();
   };
 
   const pararArrasto = (e) => {
     if (arrastando && !moveuDeFato) {
-      // Clique rápido sem arrastar: Abre gerenciador de HP
       e.stopPropagation();
       const novoHpStr = prompt(`Gerenciar HP de ${nome} (${hpAtual}/${hpMax}):\nDigite o novo valor ou ajuste com + / - (ex: -5, +5):`, hpAtual);
       if (novoHpStr !== null) {
@@ -1120,7 +1093,7 @@ window.fazerLogout = fazerLogout;
 window.mudarAba = mudarAba;
 window.importarArquivoJSON = importarArquivoJSON;
 window.salvarFichaNoSupabase = salvarFichaNoSupabase;
-window.carregarFichasDoGroup = carregarFichasDoGrupo;
+window.carregarFichasDoGrupo = carregarFichasDoGrupo;
 window.abrirFichaGrupo = abrirFichaGrupo;
 window.fecharModalFichaGrupo = fecharModalFichaGrupo;
 window.fazerUploadMapa = fazerUploadMapa;

@@ -140,6 +140,7 @@
     .fog-pintando { background-color: #a81c1c !important; color: #fff !important; border-color: #ff4d4d !important; }
     .fog-revelando { background-color: #1ca842 !important; color: #fff !important; border-color: #4dff88 !important; }
 
+    /* Centralização e Zoom Ajustados */
     .viewport {
       width: 100%;
       height: 650px;
@@ -148,17 +149,21 @@
       border-radius: 0 0 6px 6px;
       overflow: auto;
       position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .map-wrapper {
       position: relative;
       display: inline-block;
-      transform-origin: 0 0;
+      transform-origin: center center;
+      transition: transform 0.05s ease-out;
     }
 
     #mapa-img {
       display: block;
-      opacity: 1 !important; /* Mantém a visibilidade da imagem 100% nítida */
+      opacity: 1 !important;
       pointer-events: none;
     }
 
@@ -172,15 +177,18 @@
       pointer-events: none;
     }
 
-    /* Visão do Mestre: Névoa semi-transparente para você ver o mapa por baixo */
+    /* Fog of War 100% Opaco / Escuro */
     #fog-canvas {
-      opacity: 0.45;
+      opacity: 1.0;
       cursor: crosshair;
     }
 
-    /* Visão do Jogador (Caso alterne por classe) */
-    #fog-canvas.visao-jogador {
-      opacity: 1.0;
+    /* Grid da Galeria */
+    #galeria-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 15px;
+      margin-top: 15px;
     }
 
     /* Modal e Toasts */
@@ -343,8 +351,8 @@
       </div>
       <div style="margin-top: 15px;">
         <h3>Galeria Geral</h3>
-        <div id="galeria-grid" style="margin-top: 10px;">
-          <p style="color: #a8a8b3;">Carregando galeria...</p>
+        <div id="galeria-grid">
+          <p style="color: #a8a8b3;">Nenhuma imagem enviada ainda.</p>
         </div>
       </div>
     </section>
@@ -363,7 +371,6 @@
 
   <div id="toast-container"></div>
 
-  <!-- SCRIPT INTEGRADO COM TODAS AS CORREÇÕES -->
   <script>
     // --- NAVEGAÇÃO DE ABAS ---
     function mudarAba(abaId, event) {
@@ -521,7 +528,6 @@
       }
     }
 
-    // Ouvintes de evento do Mouse e Touch para Névoa
     fogCanvas.addEventListener('mousedown', (e) => {
       desenhando = true;
       aplicarNevoa(e);
@@ -538,7 +544,49 @@
     }, { passive: true });
     window.addEventListener('touchend', () => { desenhando = false; });
 
-    // --- STUBS E FUNÇÕES AUXILIARES DE EXEMPLO ---
+    // --- LÓGICA DA GALERIA ---
+    let galeriaImagens = [];
+
+    function fazerUploadImagem() {
+      const input = document.getElementById('arquivo-imagem');
+      const categoria = document.getElementById('categoria-imagem').value;
+      
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const novaImagem = {
+            id: Date.now(),
+            url: e.target.result,
+            categoria: categoria,
+            nome: input.files[0].name
+          };
+          galeriaImagens.push(novaImagem);
+          renderizarGaleria();
+          input.value = '';
+        };
+        reader.readAsDataURL(input.files[0]);
+      } else {
+        alert('Por favor, selecione uma imagem para enviar.');
+      }
+    }
+
+    function renderizarGaleria() {
+      const grid = document.getElementById('galeria-grid');
+      if (galeriaImagens.length === 0) {
+        grid.innerHTML = '<p style="color: #a8a8b3;">Nenhuma imagem enviada ainda.</p>';
+        return;
+      }
+
+      grid.innerHTML = galeriaImagens.map(img => `
+        <div style="background: #202024; border: 1px solid #29292e; border-radius: 6px; padding: 10px; text-align: center;">
+          <img src="${img.url}" alt="${img.nome}" style="width: 100%; height: 140px; object-fit: cover; border-radius: 4px; display: block; margin-bottom: 8px;">
+          <span style="font-size: 0.75rem; color: #c5a059; font-weight: bold; display: block;">${img.categoria}</span>
+          <span style="font-size: 0.7rem; color: #a8a8b3; word-break: break-all; display: block; margin-top: 2px;">${img.nome}</span>
+        </div>
+      `).join('');
+    }
+
+    // --- AUTENTICAÇÃO E DADOS ---
     function fazerLogin() {
       const nick = document.getElementById('auth-nick').value || 'Jogador';
       document.getElementById('form-login').style.display = 'none';
@@ -556,7 +604,6 @@
     function salvarFichaNoSupabase() { alert('Ficha salva no Supabase!'); }
     function carregarFichasDoGrupo() { alert('Fichas do grupo atualizadas!'); }
     function fecharModalFichaGrupo() { document.getElementById('modal-ficha-grupo').style.display = 'none'; }
-    function fazerUploadImagem() { alert('Imagem enviada para a galeria!'); }
 
     function rolarDado(lados) {
       const res = Math.floor(Math.random() * lados) + 1;

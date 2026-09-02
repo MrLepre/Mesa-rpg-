@@ -1,5 +1,5 @@
 // ==========================================
-// CRÔNICAS DE CAMELOT - APP.JS COMPLETO E GLOBAL
+// CRÔNICAS DE CAMELOT - APP.JS COMPLETO E ATUALIZADO
 // ==========================================
 
 const SUPABASE_URL = 'https://rolrbrtpqbchyxmjmvzr.supabase.co';
@@ -9,6 +9,8 @@ let supabaseClient = null;
 let dadosFichaAtual = null; 
 let canalMesa = null;
 let gridAtivo = false;
+let vttZoom = 100;
+let vttGridTamanho = 40;
 
 // Inicialização segura
 try {
@@ -223,11 +225,16 @@ async function salvarFichaNoSupabase() {
 
 async function carregarFichaDoUsuario(userId) {
   if (!supabaseClient) return;
-  const { data } = await supabaseClient
+  const { data, error } = await supabaseClient
     .from('fichas')
     .select('*')
     .eq('user_id', userId)
-    .single();
+    .maybeSingle();
+
+  if (error) {
+    console.warn('Aviso ao carregar ficha:', error.message);
+    return;
+  }
 
   if (data && data.dados_ficha) {
     dadosFichaAtual = data.dados_ficha;
@@ -445,7 +452,7 @@ function fecharModalFichaGrupo() {
   if (modalGrupo) modalGrupo.style.display = 'none';
 }
 
-// --- MAPA E MINI-VTT (GRELHA E TOKENS) ---
+// --- MAPA E MINI-VTT (GRELHA, ZOOM E TOKENS) ---
 async function fazerUploadMapa() {
   if (!supabaseClient) return alert('Supabase não conectado.');
   const input = document.getElementById('arquivo-mapa');
@@ -487,15 +494,31 @@ function exibirMapaNaTela(url) {
   if (!container) return;
 
   container.innerHTML = `
-    <div style="margin-bottom: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+    <div style="margin-bottom: 12px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; background: #18181b; padding: 10px; border-radius: 6px; border: 1px solid #29292e;">
       <button onclick="alternarGridVTT()">🗺️ Alternar Grelha</button>
       <button onclick="adicionarTokenMesa()">🛡️ Meu Token</button>
-      <span style="font-size: 0.9rem; color: var(--cam-gold-light);">* Clique no mapa para dar Ping / Arraste seu token</span>
+      
+      <div style="display: flex; align-items: center; gap: 6px; color: #fff; font-size: 0.85rem;">
+        <span>Zoom:</span>
+        <input type="range" min="100" max="300" value="${vttZoom}" oninput="ajustarZoomVTT(this.value)" style="width: 90px; cursor: pointer;">
+        <span id="zoom-label" style="min-width: 35px; color: #f3d075;">${vttZoom}%</span>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 6px; color: #fff; font-size: 0.85rem;">
+        <span>Tamanho do Grid:</span>
+        <input type="range" min="20" max="100" value="${vttGridTamanho}" oninput="ajustarGridTamanhoVTT(this.value)" style="width: 90px; cursor: pointer;">
+        <span id="grid-size-label" style="min-width: 35px; color: #f3d075;">${vttGridTamanho}px</span>
+      </div>
+
+      <span style="font-size: 0.85rem; color: var(--cam-gold-light); width: 100%; margin-top: 4px;">* Clique no mapa para dar Ping / Arraste seu token</span>
     </div>
-    <div id="vtt-canvas" class="vtt-wrapper" onclick="darPingNoMapa(event)">
-      <img src="${url}" class="vtt-mapa-img" alt="Mapa Tático de Camelot">
-      <div id="vtt-grid-camada" class="vtt-grid ${gridAtivo ? 'ativo' : ''}"></div>
-      <div id="vtt-tokens-camada" style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;"></div>
+    
+    <div id="vtt-canvas" class="vtt-wrapper" onclick="darPingNoMapa(event)" style="overflow: auto; position: relative; max-height: 70vh;">
+      <div style="position: relative; width: ${vttZoom}%; transition: width 0.1s ease;">
+        <img src="${url}" class="vtt-mapa-img" alt="Mapa Tático de Camelot" style="width: 100%; display: block;">
+        <div id="vtt-grid-camada" class="vtt-grid ${gridAtivo ? 'ativo' : ''}" style="background-size: ${vttGridTamanho}px ${vttGridTamanho}px;"></div>
+        <div id="vtt-tokens-camada" style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;"></div>
+      </div>
     </div>
   `;
 }
@@ -505,6 +528,28 @@ function alternarGridVTT() {
   const gridDiv = document.getElementById('vtt-grid-camada');
   if (gridDiv) {
     gridDiv.classList.toggle('ativo', gridAtivo);
+  }
+}
+
+function ajustarZoomVTT(valor) {
+  vttZoom = parseInt(valor);
+  const label = document.getElementById('zoom-label');
+  if (label) label.innerText = `${vttZoom}%`;
+
+  const wrapperInterno = document.querySelector('#vtt-canvas > div');
+  if (wrapperInterno) {
+    wrapperInterno.style.width = `${vttZoom}%`;
+  }
+}
+
+function ajustarGridTamanhoVTT(valor) {
+  vttGridTamanho = parseInt(valor);
+  const label = document.getElementById('grid-size-label');
+  if (label) label.innerText = `${vttGridTamanho}px`;
+
+  const gridDiv = document.getElementById('vtt-grid-camada');
+  if (gridDiv) {
+    gridDiv.style.backgroundSize = `${vttGridTamanho}px ${vttGridTamanho}px`;
   }
 }
 
@@ -862,6 +907,8 @@ window.abrirFichaGrupo = abrirFichaGrupo;
 window.fecharModalFichaGrupo = fecharModalFichaGrupo;
 window.fazerUploadMapa = fazerUploadMapa;
 window.alternarGridVTT = alternarGridVTT;
+window.ajustarZoomVTT = ajustarZoomVTT;
+window.ajustarGridTamanhoVTT = ajustarGridTamanhoVTT;
 window.darPingNoMapa = darPingNoMapa;
 window.adicionarTokenMesa = adicionarTokenMesa;
 window.rolarDado = rolarDado;

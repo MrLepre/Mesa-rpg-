@@ -500,7 +500,7 @@ function exibirMapaNaTela(url) {
       
       <div style="display: flex; align-items: center; gap: 6px; color: #fff; font-size: 0.85rem;">
         <span>Zoom:</span>
-        <input type="range" min="100" max="300" value="${vttZoom}" oninput="ajustarZoomVTT(this.value)" style="width: 90px; cursor: pointer;">
+        <input type="range" min="50" max="250" value="${vttZoom}" oninput="ajustarZoomVTT(this.value)" style="width: 90px; cursor: pointer;">
         <span id="zoom-label" style="min-width: 35px; color: #f3d075;">${vttZoom}%</span>
       </div>
 
@@ -513,10 +513,10 @@ function exibirMapaNaTela(url) {
       <span style="font-size: 0.85rem; color: var(--cam-gold-light); width: 100%; margin-top: 4px;">* Clique no mapa para dar Ping / Arraste seu token</span>
     </div>
     
-    <div id="vtt-canvas" class="vtt-wrapper" onclick="darPingNoMapa(event)" style="overflow: auto; position: relative; max-height: 70vh;">
-      <div style="position: relative; width: ${vttZoom}%; transition: width 0.1s ease;">
-        <img src="${url}" class="vtt-mapa-img" alt="Mapa Tático de Camelot" style="width: 100%; display: block;">
-        <div id="vtt-grid-camada" class="vtt-grid ${gridAtivo ? 'ativo' : ''}" style="background-size: ${vttGridTamanho}px ${vttGridTamanho}px;"></div>
+    <div id="vtt-canvas" class="vtt-wrapper" onclick="darPingNoMapa(event)" style="overflow: auto; position: relative; max-height: 65vh; border: 1px solid #29292e; border-radius: 6px; background: #0b0d12;">
+      <div id="vtt-mapa-scaler" style="position: relative; width: 100%; transform: scale(${vttZoom / 100}); transform-origin: top left; transition: transform 0.05s ease-out;">
+        <img src="${url}" class="vtt-mapa-img" alt="Mapa Tático de Camelot" style="width: 100%; display: block; height: auto;">
+        <div id="vtt-grid-camada" class="vtt-grid ${gridAtivo ? 'ativo' : ''}" style="background-size: ${vttGridTamanho}px ${vttGridTamanho}px; position: absolute; top:0; left:0; width:100%; height:100%;"></div>
         <div id="vtt-tokens-camada" style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;"></div>
       </div>
     </div>
@@ -536,9 +536,9 @@ function ajustarZoomVTT(valor) {
   const label = document.getElementById('zoom-label');
   if (label) label.innerText = `${vttZoom}%`;
 
-  const wrapperInterno = document.querySelector('#vtt-canvas > div');
-  if (wrapperInterno) {
-    wrapperInterno.style.width = `${vttZoom}%`;
+  const scaler = document.getElementById('vtt-mapa-scaler');
+  if (scaler) {
+    scaler.style.transform = `scale(${vttZoom / 100})`;
   }
 }
 

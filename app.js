@@ -1,5 +1,5 @@
 // ==========================================
-// CRÔNICAS DE CAMELOT - APP.JS COMPLETO E ATUALIZADO
+// CRÔNICAS DE CAMELOT - APP.JS COMPLETO E ATUALIZADO (COM PAN & ZOOM LIVRE / CADEADO)
 // ==========================================
 
 const SUPABASE_URL = 'https://rolrbrtpqbchyxmjmvzr.supabase.co';
@@ -12,6 +12,11 @@ let gridAtivo = false;
 let vttZoom = 100;
 let vttGridTamanho = 40;
 let ehMestreGlobal = false;
+
+// Novas variáveis para controle de Posição (Pan) e Cadeado do Mapa
+let vttPanX = 0;
+let vttPanY = 0;
+let vttMovimentoLivre = false; // Controlado pelo cadeado do Mestre
 
 // Inicialização segura
 try {
@@ -44,7 +49,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         })
         .on('broadcast', { event: 'vtt_zoom' }, (payload) => {
           vttZoom = payload.payload.zoom;
-          ajustarZoomVTT(vttZoom);
+          vttPanX = payload.payload.panX || 0;
+          vttPanY = payload.payload.panY || 0;
+          atualizarTransformMapaVTT();
         })
         .on('broadcast', { event: 'nova_rolagem' }, (payload) => {
           registrarRolagemHistorico(payload.payload.descricao, payload.payload.resultado, true);
@@ -458,7 +465,7 @@ function fecharModalFichaGrupo() {
   if (modalGrupo) modalGrupo.style.display = 'none';
 }
 
-// --- MAPA E MINI-VTT (ZOOM DO MESTRE CENTRALIZADO, GRELHA E TOKENS) ---
+// --- MAPA E MINI-VTT (ZOOM DO MESTRE, PAN/CADEADO E GRELHA) ---
 async function fazerUploadMapa() {
   if (!supabaseClient) return alert('Supabase não conectado.');
   const input = document.getElementById('arquivo-mapa');
@@ -504,9 +511,12 @@ function exibirMapaNaTela(url) {
     zoomControlHTML = `
       <div style="display: flex; align-items: center; gap: 6px; color: #fff; font-size: 0.85rem;">
         <span>Zoom (Mestre):</span>
-        <input type="range" min="50" max="250" value="${vttZoom}" oninput="alterarZoomMaster(this.value)" style="width: 90px; cursor: pointer;">
+        <input type="range" min="50" max="300" value="${vttZoom}" oninput="alterarZoomMaster(this.value)" style="width: 90px; cursor: pointer;">
         <span id="zoom-label" style="min-width: 35px; color: #f3d075;">${vttZoom}%</span>
       </div>
+      <button id="btn-cadeado-vtt" onclick="alternarMovimentoMapa()" style="background: ${vttMovimentoLivre ? '#04d361' : '#29292e'}; color: #fff; border: 1px solid #4a3d24; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">
+        ${vttMovimentoLivre ? '🔓 Destravado (Arraste)' : '🔒 Travado'}
+      </button>
     `;
   } else {
     zoomControlHTML = `
@@ -530,17 +540,97 @@ function exibirMapaNaTela(url) {
         <span id="grid-size-label" style="min-width: 35px; color: #f3d075;">${vttGridTamanho}px</span>
       </div>
 
-      <span style="font-size: 0.85rem; color: var(--cam-gold-light); width: 100%; margin-top: 4px;">* Clique no mapa para dar Ping / Arraste seu token</span>
+      <span style="font-size: 0.85rem; color: var(--cam-gold-light); width: 100%; margin-top: 4px;">* Clique no mapa para dar Ping / Arraste seu token ${ehMestreGlobal && vttMovimentoLivre ? '/ Arraste o mapa para mover' : ''}</span>
     </div>
     
-    <div id="vtt-canvas" class="vtt-wrapper" onclick="darPingNoMapa(event)" style="overflow: hidden; position: relative; max-height: 65vh; border: 1px solid #29292e; border-radius: 6px; background: #0b0d12; display: flex; justify-content: center; align-items: center;">
-      <div id="vtt-mapa-scaler" style="position: relative; width: 100%; transform: scale(${vttZoom / 100}); transform-origin: center center; transition: transform 0.05s ease-out; display: flex; justify-content: center; align-items: center;">
-        <img src="${url}" class="vtt-mapa-img" alt="Mapa Tático de Camelot" style="width: 100%; display: block; height: auto;">
-        <div id="vtt-grid-camada" class="vtt-grid ${gridAtivo ? 'ativo' : ''}" style="background-size: ${vttGridTamanho}px ${vttGridTamanho}px; position: absolute; top:0; left:0; width:100%; height:100%;"></div>
-        <div id="vtt-tokens-camada" style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;"></div>
+    <div id="vtt-canvas" class="vtt-wrapper" style="overflow: hidden; position: relative; max-height: 65vh; border: 1px solid #29292e; border-radius: 6px; background: #0b0d12; display: flex; justify-content: center; align-items: center; cursor: ${ehMestreGlobal && vttMovimentoLivre ? 'grab' : 'crosshair'};">
+      <div id="vtt-mapa-scaler" style="position: relative; width: 100%; transform: translate(${vttPanX}px, ${vttPanY}px) scale(${vttZoom / 100}); transform-origin: center center; transition: transform 0.05s ease-out; display: flex; justify-content: center; align-items: center;">
+        <img src="${url}" class="vtt-mapa-img" alt="Mapa Tático de Camelot" style="width: 100%; display: block; height: auto; pointer-events: none;">
+        <div id="vtt-grid-camada" class="vtt-grid ${gridAtivo ? 'ativo' : ''}" style="background-size: ${vttGridTamanho}px ${vttGridTamanho}px; position: absolute; top:0; left:0; width:100%; height:100%; pointer-events: none;"></div>
+        <div id="vtt-tokens-camada" style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events: none;"></div>
       </div>
     </div>
   `;
+
+  configurarPanMapa();
+}
+
+// Configura o arrasto (Pan) do mapa para o Mestre quando destravado
+function configurarPanMapa() {
+  const canvas = document.getElementById('vtt-canvas');
+  if (!canvas) return;
+
+  let estaMovendoMapa = false;
+  let inicioX = 0;
+  let inicioY = 0;
+
+  const iniciarPan = (e) => {
+    // Se for clique em token ou se o cadeado estiver travado, ignora o pan do mapa e trata clique normal (Ping)
+    if (e.target.classList.contains('vtt-token')) return;
+    
+    if (ehMestreGlobal && vttMovimentoLivre) {
+      estaMovendoMapa = true;
+      inicioX = (e.clientX || e.touches?.[0].clientX) - vttPanX;
+      inicioY = (e.clientY || e.touches?.[0].clientY) - vttPanY;
+      canvas.style.cursor = 'grabbing';
+      e.preventDefault();
+    } else {
+      // Comportamento normal de Ping se travado
+      darPingNoMapa(e);
+    }
+  };
+
+  const moverPan = (e) => {
+    if (!estaMovendoMapa) return;
+    const clientX = e.clientX || e.touches?.[0].clientX;
+    const clientY = e.clientY || e.touches?.[0].clientY;
+
+    vttPanX = clientX - inicioX;
+    vttPanY = clientY - inicioY;
+
+    atualizarTransformMapaVTT();
+  };
+
+  const pararPan = () => {
+    if (estaMovendoMapa) {
+      estaMovendoMapa = false;
+      if (canvas) canvas.style.cursor = 'grab';
+      
+      // Sincronizar com os jogadores via broadcast
+      if (canalMesa && ehMestreGlobal) {
+        canalMesa.send({
+          type: 'broadcast',
+          event: 'vtt_zoom',
+          payload: { zoom: vttZoom, panX: vttPanX, panY: vttPanY }
+        });
+      }
+    }
+  };
+
+  canvas.onmousedown = iniciarPan;
+  window.onmousemove = moverPan;
+  window.onmouseup = pararPan;
+
+  canvas.ontouchstart = iniciarPan;
+  window.ontouchmove = moverPan;
+  window.ontouchend = pararPan;
+}
+
+function alternarMovimentoMapa() {
+  if (!ehMestreGlobal) return;
+  vttMovimentoLivre = !vttMovimentoLivre;
+  
+  const btn = document.getElementById('btn-cadeado-vtt');
+  const canvas = document.getElementById('vtt-canvas');
+  
+  if (btn) {
+    btn.style.background = vttMovimentoLivre ? '#04d361' : '#29292e';
+    btn.innerText = vttMovimentoLivre ? '🔓 Destravado (Arraste)' : '🔒 Travado';
+  }
+  if (canvas) {
+    canvas.style.cursor = vttMovimentoLivre ? 'grab' : 'crosshair';
+  }
+  mostrarPopup(vttMovimentoLivre ? '🔓 Mapa destravado para movimento livre!' : '🔒 Mapa travado na posição atual.');
 }
 
 function alternarGridVTT() {
@@ -554,25 +644,24 @@ function alternarGridVTT() {
 function alterarZoomMaster(valor) {
   if (!ehMestreGlobal) return;
   vttZoom = parseInt(valor);
-  ajustarZoomVTT(vttZoom);
+  atualizarTransformMapaVTT();
 
   if (canalMesa) {
     canalMesa.send({
       type: 'broadcast',
       event: 'vtt_zoom',
-      payload: { zoom: vttZoom }
+      payload: { zoom: vttZoom, panX: vttPanX, panY: vttPanY }
     });
   }
 }
 
-function ajustarZoomVTT(valor) {
-  vttZoom = parseInt(valor);
+function atualizarTransformMapaVTT() {
   const label = document.getElementById('zoom-label');
   if (label) label.innerText = `${vttZoom}%`;
 
   const scaler = document.getElementById('vtt-mapa-scaler');
   if (scaler) {
-    scaler.style.transform = `scale(${vttZoom / 100})`;
+    scaler.style.transform = `translate(${vttPanX}px, ${vttPanY}px) scale(${vttZoom / 100})`;
   }
 }
 
@@ -588,7 +677,7 @@ function ajustarGridTamanhoVTT(valor) {
 }
 
 function darPingNoMapa(event) {
-  if (event.target.classList.contains('vtt-token')) return;
+  if (event.target.classList.contains('vtt-token') || vttMovimentoLivre) return;
 
   const canvas = document.getElementById('vtt-canvas');
   if (!canvas) return;
@@ -942,10 +1031,11 @@ window.fecharModalFichaGrupo = fecharModalFichaGrupo;
 window.fazerUploadMapa = fazerUploadMapa;
 window.alternarGridVTT = alternarGridVTT;
 window.alterarZoomMaster = alterarZoomMaster;
-window.ajustarZoomVTT = ajustarZoomVTT;
+window.atualizarTransformMapaVTT = atualizarTransformMapaVTT;
 window.ajustarGridTamanhoVTT = ajustarGridTamanhoVTT;
 window.darPingNoMapa = darPingNoMapa;
 window.adicionarTokenMesa = adicionarTokenMesa;
 window.rolarDado = rolarDado;
 window.rolarExpressaoPersonalizada = rolarExpressaoPersonalizada;
 window.fazerUploadImagem = fazerUploadImagem;
+window.alternarMovimentoMapa = alternarMovimentoMapa;

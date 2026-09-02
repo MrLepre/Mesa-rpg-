@@ -58,15 +58,52 @@
       </div>
     </section>
 
+    <!-- Aba do Mapa com Ferramentas Táticas e Névoa Corrigida -->
     <section id="aba-mapa" class="painel">
       <h2>Mapa Tático e Mini-VTT</h2>
+      
       <div id="painel-upload-mestre" style="display: none; background: #202024; padding: 15px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #c5a059;">
         <h3 style="color: #c5a059; margin-bottom: 8px;">Painel do Mestre: Enviar Novo Mapa</h3>
         <input type="file" id="arquivo-mapa" accept="image/*" style="margin-bottom: 10px; display: block;">
         <button onclick="fazerUploadMapa()" style="background: #c5a059; color: #121214; font-weight: bold; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer;">Publicar Mapa para o Grupo</button>
       </div>
-      <div id="container-mapa">
-        <p style="color: #a8a8b3;">Nenhum mapa carregado no momento.</p>
+
+      <!-- Toolbar com Controles de Grelha, Zoom, Trava e Névoa (Tristate) -->
+      <div class="toolbar" style="display: flex; align-items: center; gap: 12px; background-color: #121318; border: 1px solid #333; padding: 8px 12px; border-radius: 4px 4px 0 0; flex-wrap: wrap; margin-bottom: 5px;">
+        <button class="tool-btn active" id="btn-grelha" onclick="toggleGrelha()">🔷 GRELHA</button>
+        <button class="tool-btn" id="btn-token">📍 MEU TOKEN</button>
+
+        <div class="slider-group" style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #fff;">
+          <label>Zoom:</label>
+          <input type="range" id="zoomRange" min="20" max="200" value="100" oninput="atualizarZoom(this.value)">
+          <span id="zoomVal">100%</span>
+        </div>
+
+        <button class="tool-btn" id="btn-trava" onclick="toggleTrava()">🔒 TRAVADO</button>
+
+        <!-- Botão Tristate do Fog: DESATIVADO -> PINTANDO -> REVELANDO -->
+        <button class="tool-btn fog-desativado" id="btn-fog" onclick="alternarModoFog()">👁️ FOG: DESATIVADO</button>
+
+        <div class="slider-group" style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #fff;">
+          <label>Grid:</label>
+          <input type="range" id="gridRange" min="20" max="100" value="40" oninput="atualizarGrid(this.value)">
+          <span id="gridVal">40px</span>
+        </div>
+
+        <div class="slider-group" style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #fff;">
+          <label>Pincel Fog:</label>
+          <input type="range" id="pincelRange" min="10" max="120" value="40" oninput="atualizarPincel(this.value)">
+          <span id="pincelVal">40px</span>
+        </div>
+      </div>
+
+      <!-- Container do Mapa com Overlay de Canvases (Imagens Nítidas e Fog Editável) -->
+      <div id="container-mapa" class="viewport" style="width: 100%; height: 650px; background-color: #050505; border: 1px solid #333; overflow: auto; position: relative;">
+        <div class="map-wrapper" id="mapWrapper" style="position: relative; display: inline-block; transform-origin: 0 0;">
+          <img id="mapa-img" src="" alt="Mapa Tático" style="display: none; opacity: 1 !important; pointer-events: none;">
+          <canvas id="grid-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none;"></canvas>
+          <canvas id="fog-canvas" style="position: absolute; top: 0; left: 0; opacity: 0.45; cursor: crosshair; pointer-events: none;"></canvas>
+        </div>
       </div>
     </section>
 

@@ -1,5 +1,5 @@
 // ==========================================
-// CRÔNICAS DE CAMELOT - APP.JS COMPLETO E ATUALIZADO (MAPA & TOKENS CORRIGIDOS)
+// CRÔNICAS DE CAMELOT - APP.JS COMPLETO E ATUALIZADO (HP NOS TOKENS)
 // ==========================================
 
 const SUPABASE_URL = 'https://rolrbrtpqbchyxmjmvzr.supabase.co';
@@ -60,7 +60,17 @@ document.addEventListener('DOMContentLoaded', async () => {
           criarEfeitoPing(payload.payload.x, payload.payload.y);
         })
         .on('broadcast', { event: 'vtt_mover_token' }, (payload) => {
-          criarElementoToken(payload.payload.id, payload.payload.nome, payload.payload.x, payload.payload.y, payload.payload.tamanho || 45, payload.payload.imagem || '', false);
+          criarElementoToken(
+            payload.payload.id, 
+            payload.payload.nome, 
+            payload.payload.x, 
+            payload.payload.y, 
+            payload.payload.tamanho || 45, 
+            payload.payload.imagem || '', 
+            payload.payload.hpAtual ?? 50, 
+            payload.payload.hpMax ?? 50, 
+            false
+          );
         })
         .subscribe();
 
@@ -540,7 +550,7 @@ function exibirMapaNaTela(url) {
         <span id="grid-size-label" style="min-width: 35px; color: #f3d075;">${vttGridTamanho}px</span>
       </div>
 
-      <span style="font-size: 0.85rem; color: var(--cam-gold-light); width: 100%; margin-top: 4px;">* Clique no mapa para dar Ping / Arraste seu token ${ehMestreGlobal && vttMovimentoLivre ? '/ Arraste o mapa para mover' : ''}</span>
+      <span style="font-size: 0.85rem; color: var(--cam-gold-light); width: 100%; margin-top: 4px;">* Clique no mapa para dar Ping / Clique no token para alterar o HP / Arraste seu token ${ehMestreGlobal && vttMovimentoLivre ? '/ Arraste o mapa para mover' : ''}</span>
     </div>
     
     <div id="vtt-canvas" class="vtt-wrapper" style="overflow: hidden; position: relative; max-height: 65vh; border: 1px solid #29292e; border-radius: 6px; background: #0b0d12; display: flex; justify-content: center; align-items: center; cursor: ${ehMestreGlobal && vttMovimentoLivre ? 'grab' : 'crosshair'};">
@@ -706,7 +716,7 @@ function criarEfeitoPing(x, y) {
   setTimeout(() => ping.remove(), 1000);
 }
 
-// --- MODAL DE CONFIGURAÇÃO DE TOKEN (TAMANHO E IMAGEM) ---
+// --- MODAL DE CONFIGURAÇÃO DE TOKEN (TAMANHO, IMAGEM E HP) ---
 async function abrirModalConfigToken() {
   let modal = document.getElementById('modal-config-token');
   if (!modal) {
@@ -721,9 +731,9 @@ async function abrirModalConfigToken() {
     const { data } = await supabaseClient.from('galeria_imagens').select('*').order('criado_em', { ascending: false });
     if (data && data.length > 0) {
       imagensHtml = `
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 8px; max-height: 160px; overflow-y: auto; background: #0b0d12; padding: 8px; border-radius: 4px; border: 1px solid #29292e;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 8px; max-height: 140px; overflow-y: auto; background: #0b0d12; padding: 8px; border-radius: 4px; border: 1px solid #29292e;">
           ${data.map(img => `
-            <div class="opcao-img-token" onclick="selecionarImgToken('${img.url}', this)" style="cursor: pointer; border: 2px solid transparent; border-radius: 4px; overflow: hidden; height: 60px;">
+            <div class="opcao-img-token" onclick="selecionarImgToken('${img.url}', this)" style="cursor: pointer; border: 2px solid transparent; border-radius: 4px; overflow: hidden; height: 50px;">
               <img src="${img.url}" style="width: 100%; height: 100%; object-fit: cover;">
             </div>
           `).join('')}
@@ -736,32 +746,38 @@ async function abrirModalConfigToken() {
 
   modal.innerHTML = `
     <div style="background: #151821; border: 2px solid #8257e5; padding: 20px; border-radius: 8px; width: 420px; max-width: 90%; color: #fff; font-family: 'EB Garamond', serif;">
-      <h3 style="color: #f3d075; font-family: 'Cinzel', serif; margin-bottom: 15px; text-align: center;">Configurar Meu Token</h3>
+      <h3 style="color: #f3d075; font-family: 'Cinzel', serif; margin-bottom: 12px; text-align: center;">Configurar Meu Token</h3>
       
-      <div style="margin-bottom: 12px;">
-        <label style="display: block; font-size: 0.9rem; color: #e6ca88; margin-bottom: 5px;">Tamanho do Token:</label>
-        <select id="token-tamanho-select" style="width: 100%; padding: 8px; background: #0b0d12; color: #fff; border: 1px solid #4a3d24; border-radius: 4px;">
-          <option value="35">Pequeno (35px)</option>
-          <option value="45" selected>Padrão (45px)</option>
-          <option value="65">Médio / Grande (65px)</option>
-          <option value="90">Gigante (90px)</option>
-        </select>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+        <div>
+          <label style="display: block; font-size: 0.85rem; color: #e6ca88; margin-bottom: 4px;">Tamanho:</label>
+          <select id="token-tamanho-select" style="width: 100%; padding: 6px; background: #0b0d12; color: #fff; border: 1px solid #4a3d24; border-radius: 4px; font-size: 0.85rem;">
+            <option value="35">Pequeno (35px)</option>
+            <option value="45" selected>Padrão (45px)</option>
+            <option value="65">Médio (65px)</option>
+            <option value="90">Gigante (90px)</option>
+          </select>
+        </div>
+        <div>
+          <label style="display: block; font-size: 0.85rem; color: #e6ca88; margin-bottom: 4px;">HP Máximo:</label>
+          <input type="number" id="token-hp-input" value="50" style="width: 100%; padding: 6px; background: #0b0d12; color: #fff; border: 1px solid #4a3d24; border-radius: 4px; font-size: 0.85rem;">
+        </div>
       </div>
 
-      <div style="margin-bottom: 12px;">
-        <label style="display: block; font-size: 0.9rem; color: #e6ca88; margin-bottom: 5px;">Escolher Imagem da Galeria:</label>
+      <div style="margin-bottom: 10px;">
+        <label style="display: block; font-size: 0.85rem; color: #e6ca88; margin-bottom: 4px;">Escolher Imagem da Galeria:</label>
         <input type="hidden" id="token-url-escolhida" value="">
         ${imagensHtml}
       </div>
 
       <div style="margin-bottom: 15px;">
-        <label style="display: block; font-size: 0.9rem; color: #e6ca88; margin-bottom: 5px;">Ou cole o Link Direto da Imagem:</label>
-        <input type="text" id="token-url-input" placeholder="https://exemplo.com/imagem.png" oninput="document.getElementById('token-url-escolhida').value=this.value" style="width: 100%; padding: 8px; background: #0b0d12; color: #fff; border: 1px solid #4a3d24; border-radius: 4px; font-size: 0.85rem;">
+        <label style="display: block; font-size: 0.85rem; color: #e6ca88; margin-bottom: 4px;">Ou Link Direto da Imagem:</label>
+        <input type="text" id="token-url-input" placeholder="https://exemplo.com/imagem.png" oninput="document.getElementById('token-url-escolhida').value=this.value" style="width: 100%; padding: 6px; background: #0b0d12; color: #fff; border: 1px solid #4a3d24; border-radius: 4px; font-size: 0.85rem;">
       </div>
 
       <div style="display: flex; gap: 10px; justify-content: flex-end;">
-        <button onclick="document.getElementById('modal-config-token').style.display='none'" style="background: #29292e; color: #fff; border: none; padding: 8px 14px; border-radius: 4px; cursor: pointer;">Cancelar</button>
-        <button onclick="confirmarCriacaoToken()" style="background: #8257e5; color: #fff; border: none; padding: 8px 14px; border-radius: 4px; cursor: pointer; font-weight: bold;">Salvar e Posicionar</button>
+        <button onclick="document.getElementById('modal-config-token').style.display='none'" style="background: #29292e; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer;">Cancelar</button>
+        <button onclick="confirmarCriacaoToken()" style="background: #8257e5; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold;">Salvar e Posicionar</button>
       </div>
     </div>
   `;
@@ -777,29 +793,30 @@ function selecionarImgToken(url, elem) {
 
 function confirmarCriacaoToken() {
   const tamanho = parseInt(document.getElementById('token-tamanho-select').value) || 45;
+  const hpMax = parseInt(document.getElementById('token-hp-input').value) || 50;
   const imagem = document.getElementById('token-url-escolhida').value.trim();
   document.getElementById('modal-config-token').style.display = 'none';
   
-  executarAdicionarTokenMesa(tamanho, imagem);
+  executarAdicionarTokenMesa(tamanho, imagem, hpMax, hpMax);
 }
 
-function executarAdicionarTokenMesa(tamanho = 45, imagem = '') {
+function executarAdicionarTokenMesa(tamanho = 45, imagem = '', hpMax = 50, hpAtual = 50) {
   const userNick = document.getElementById('user-nick-display')?.innerText || document.getElementById('auth-nick')?.value || 'Cavaleiro';
   const tokenID = 'token_' + (userNick.toLowerCase().replace(/[^a-z0-9]/g, '_'));
 
-  criarElementoToken(tokenID, userNick, 10, 10, tamanho, imagem, true);
+  criarElementoToken(tokenID, userNick, 10, 10, tamanho, imagem, hpAtual, hpMax, true);
   
   if (canalMesa) {
     canalMesa.send({
       type: 'broadcast',
       event: 'vtt_mover_token',
-      payload: { id: tokenID, nome: userNick, x: 10, y: 10, tamanho, imagem }
+      payload: { id: tokenID, nome: userNick, x: 10, y: 10, tamanho, imagem, hpAtual, hpMax }
     });
   }
   mostrarPopup('🛡️ Token posicionado na Távola!');
 }
 
-function criarElementoToken(id, nome, x, y, tamanho = 45, imagem = '', ehMeu = false) {
+function criarElementoToken(id, nome, x, y, tamanho = 45, imagem = '', hpAtual = 50, hpMax = 50, ehMeu = false) {
   let camada = document.getElementById('vtt-tokens-camada');
   if (!camada) return;
 
@@ -808,7 +825,7 @@ function criarElementoToken(id, nome, x, y, tamanho = 45, imagem = '', ehMeu = f
     token = document.createElement('div');
     token.id = id;
     token.className = 'vtt-token';
-    token.title = nome;
+    token.title = `${nome} (HP: ${hpAtual}/${hpMax})`;
     camada.appendChild(token);
   }
 
@@ -826,7 +843,7 @@ function criarElementoToken(id, nome, x, y, tamanho = 45, imagem = '', ehMeu = f
   token.style.fontWeight = 'bold';
   token.style.fontSize = '0.75rem';
   token.style.color = '#fff';
-  token.style.overflow = 'hidden';
+  token.style.overflow = 'visible';
 
   if (imagem) {
     token.style.backgroundImage = `url(${imagem})`;
@@ -843,21 +860,35 @@ function criarElementoToken(id, nome, x, y, tamanho = 45, imagem = '', ehMeu = f
   token.style.top = `${y}%`;
   token.style.pointerEvents = 'auto';
 
-  if (ehMeu) {
-    ativarArrastoToken(token, id, nome, tamanho, imagem);
+  // Etiqueta de HP flutuando abaixo do token
+  let hpTag = token.querySelector('.vtt-token-hp');
+  if (!hpTag) {
+    hpTag = document.createElement('div');
+    hpTag.className = 'vtt-token-hp';
+    hpTag.style.cssText = 'position: absolute; bottom: -16px; left: 50%; transform: translateX(-50%); background: #121214; border: 1px solid #4a3d24; color: #04d361; font-size: 0.65rem; padding: 1px 5px; border-radius: 4px; white-space: nowrap; pointer-events: none; font-family: sans-serif; font-weight: bold;';
+    token.appendChild(hpTag);
+  }
+  hpTag.innerText = `${hpAtual}/${hpMax}`;
+  hpTag.style.color = hpAtual <= (hpMax * 0.25) ? '#ff5252' : (hpAtual <= (hpMax * 0.5) ? '#ffab40' : '#04d361');
+
+  if (ehMeu || ehMestreGlobal) {
+    ativarArrastoToken(token, id, nome, tamanho, imagem, hpAtual, hpMax);
   }
 }
 
-function ativarArrastoToken(token, id, nome, tamanho, imagem) {
+function ativarArrastoToken(token, id, nome, tamanho, imagem, hpAtual, hpMax) {
   let arrastando = false;
+  let moveuDeFato = false;
 
   const iniciarArrasto = (e) => {
     arrastando = true;
+    moveuDeFato = false;
     e.stopPropagation();
   };
 
   const mover = (e) => {
     if (!arrastando) return;
+    moveuDeFato = true;
     const canvas = document.getElementById('vtt-canvas');
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -878,12 +909,42 @@ function ativarArrastoToken(token, id, nome, tamanho, imagem) {
       canalMesa.send({
         type: 'broadcast',
         event: 'vtt_mover_token',
-        payload: { id, nome, x, y, tamanho, imagem }
+        payload: { id, nome, x, y, tamanho, imagem, hpAtual, hpMax }
       });
     }
   };
 
-  const pararArrasto = () => {
+  const pararArrasto = (e) => {
+    if (arrastando && !moveuDeFato) {
+      // Clique rápido sem arrastar: Abre gerenciador de HP
+      e.stopPropagation();
+      const novoHpStr = prompt(`Gerenciar HP de ${nome} (Atual: ${hpAtual}/${hpMax}):\nDigite o novo valor de HP ou ajuste com + / - (ex: -5 para dano, +5 para cura):`, hpAtual);
+      if (novoHpStr !== null) {
+        let calculado = hpAtual;
+        const valorTrim = novoHpStr.trim();
+        if (valorTrim.startsWith('+') || valorTrim.startsWith('-')) {
+          calculado = Math.max(0, Math.min(hpMax, hpAtual + parseInt(valorTrim)));
+        } else {
+          calculado = Math.max(0, Math.min(hpMax, parseInt(valorTrim) || 0));
+        }
+
+        hpAtual = calculado;
+        let hpTag = token.querySelector('.vtt-token-hp');
+        if (hpTag) {
+          hpTag.innerText = `${hpAtual}/${hpMax}`;
+          hpTag.style.color = hpAtual <= (hpMax * 0.25) ? '#ff5252' : (hpAtual <= (hpMax * 0.5) ? '#ffab40' : '#04d361');
+        }
+
+        if (canalMesa) {
+          canalMesa.send({
+            type: 'broadcast',
+            event: 'vtt_mover_token',
+            payload: { id, nome, x: parseFloat(token.style.left), y: parseFloat(token.style.top), tamanho, imagem, hpAtual, hpMax }
+          });
+        }
+        mostrarPopup(`❤️ HP de ${nome} atualizado para ${hpAtual}/${hpMax}`);
+      }
+    }
     arrastando = false;
   };
 

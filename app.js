@@ -458,7 +458,7 @@ function fecharModalFichaGrupo() {
   if (modalGrupo) modalGrupo.style.display = 'none';
 }
 
-// --- MAPA E MINI-VTT (ZOOM DO MESTRE, GRELHA E TOKENS) ---
+// --- MAPA E MINI-VTT (ZOOM DO MESTRE CENTRALIZADO, GRELHA E TOKENS) ---
 async function fazerUploadMapa() {
   if (!supabaseClient) return alert('Supabase não conectado.');
   const input = document.getElementById('arquivo-mapa');
@@ -534,7 +534,7 @@ function exibirMapaNaTela(url) {
     </div>
     
     <div id="vtt-canvas" class="vtt-wrapper" onclick="darPingNoMapa(event)" style="overflow: hidden; position: relative; max-height: 65vh; border: 1px solid #29292e; border-radius: 6px; background: #0b0d12; display: flex; justify-content: center; align-items: center;">
-      <div id="vtt-mapa-scaler" style="position: relative; width: 100%; transform: scale(${vttZoom / 100}); transform-origin: top left; transition: transform 0.05s ease-out;">
+      <div id="vtt-mapa-scaler" style="position: relative; width: 100%; transform: scale(${vttZoom / 100}); transform-origin: center center; transition: transform 0.05s ease-out; display: flex; justify-content: center; align-items: center;">
         <img src="${url}" class="vtt-mapa-img" alt="Mapa Tático de Camelot" style="width: 100%; display: block; height: auto;">
         <div id="vtt-grid-camada" class="vtt-grid ${gridAtivo ? 'ativo' : ''}" style="background-size: ${vttGridTamanho}px ${vttGridTamanho}px; position: absolute; top:0; left:0; width:100%; height:100%;"></div>
         <div id="vtt-tokens-camada" style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;"></div>
@@ -936,7 +936,7 @@ window.fazerLogout = fazerLogout;
 window.mudarAba = mudarAba;
 window.importarArquivoJSON = importarArquivoJSON;
 window.salvarFichaNoSupabase = salvarFichaNoSupabase;
-window.carregarFichasDoGrupo = carregarFichasDoGrupo;
+window.carregarFichasDoGroup = carregarFichasDoGrupo;
 window.abrirFichaGrupo = abrirFichaGrupo;
 window.fecharModalFichaGrupo = fecharModalFichaGrupo;
 window.fazerUploadMapa = fazerUploadMapa;

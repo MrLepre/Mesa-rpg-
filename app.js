@@ -252,7 +252,7 @@ async function carregarFichasDoGrupo() {
   if (!supabaseClient) return;
   const lista = document.getElementById('lista-fichas-grupo');
   if (!lista) return;
-  lista.innerHTML = '<p style="color: #a8a8b3;">Carregando fichas...</p>';
+  lista.innerHTML = '<p style="color: #a8a8b3;">Carregando fichas dos cavaleiros...</p>';
 
   const { data, error } = await supabaseClient
     .from('fichas')
@@ -264,22 +264,26 @@ async function carregarFichasDoGrupo() {
   }
 
   lista.innerHTML = '';
-  data.forEach((item, index) => {
+  
+  data.forEach((item) => {
     const card = document.createElement('div');
     card.style.cssText = 'background: #202024; padding: 1rem; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #29292e; margin-bottom: 8px;';
     
-    card.innerHTML = `
-      <div>
-        <strong style="color: #fff; font-size: 1.1rem;">${item.nome_personagem}</strong>
-      </div>
-      <button id="btn-ficha-${index}" style="background: #8257e5; color: #fff; border: none; padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font-weight: bold;">Ver Ficha</button>
-    `;
-    lista.appendChild(card);
-
-    // Associação limpa do evento via JavaScript direto para evitar qualquer quebra de sintaxe
-    document.getElementById(`btn-ficha-${index}`).onclick = () => {
+    const infoDiv = document.createElement('div');
+    const nomeCavaleiro = item.nome_personagem || 'Cavaleiro Desconhecido';
+    infoDiv.innerHTML = `<strong style="color: #fff; font-size: 1.1rem;">${nomeCavaleiro}</strong>`;
+    
+    const botaoVer = document.createElement('button');
+    botaoVer.innerText = 'Ver Ficha';
+    botaoVer.style.cssText = 'background: #8257e5; color: #fff; border: none; padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font-weight: bold;';
+    
+    botaoVer.onclick = () => {
       abrirFichaGrupo(item.dados_ficha);
     };
+
+    card.appendChild(infoDiv);
+    card.appendChild(botaoVer);
+    lista.appendChild(card);
   });
 }
 

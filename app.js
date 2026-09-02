@@ -1,5 +1,5 @@
 // ==========================================
-// CRÔNICAS DE CAMELOT - APP.JS (CORRIGIDO E OTIMIZADO)
+// CRÔNICAS DE CAMELOT - APP.JS
 // ==========================================
 
 const SUPABASE_URL = 'https://rolrbrtpqbchyxmjmvzr.supabase.co';
@@ -17,6 +17,7 @@ let ehMestreGlobal = false;
 let vttPanX = 0;
 let vttPanY = 0;
 let vttMovimentoLivre = false;
+let mapaModoImersivo = false;
 
 // Inicialização segura
 try {
@@ -450,6 +451,8 @@ function exibirMapaNaTela(url) {
     `;
   }
 
+  const alturaMapa = mapaModoImersivo ? '80vh' : '55vh';
+
   container.innerHTML = `
     <div style="margin-bottom: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: #18181b; padding: 8px; border-radius: 6px; border: 1px solid #29292e;">
       <button onclick="alternarGridVTT()" style="padding: 6px 10px; font-size: 0.85rem;">🗺️ Grelha</button>
@@ -464,7 +467,7 @@ function exibirMapaNaTela(url) {
       </div>
     </div>
     
-    <div id="vtt-canvas" class="vtt-wrapper" style="overflow: hidden; position: relative; width: 100%; height: 55vh; border: 1px solid #29292e; border-radius: 6px; background: #0b0d12; display: flex; justify-content: center; align-items: center; touch-action: none; cursor: ${ehMestreGlobal && vttMovimentoLivre ? 'grab' : 'crosshair'};">
+    <div id="vtt-canvas" class="vtt-wrapper" style="overflow: hidden; position: relative; width: 100%; height: ${alturaMapa}; border: 1px solid #29292e; border-radius: 6px; background: #0b0d12; display: flex; justify-content: center; align-items: center; touch-action: none; cursor: ${ehMestreGlobal && vttMovimentoLivre ? 'grab' : 'crosshair'}; transition: height 0.3s ease;">
       <div id="vtt-mapa-scaler" style="position: relative; width: 100%; transform: translate(${vttPanX}px, ${vttPanY}px) scale(${vttZoom / 100}); transform-origin: center center; transition: transform 0.05s ease-out; display: flex; justify-content: center; align-items: center;">
         <img src="${url}" class="vtt-mapa-img" alt="Mapa Tático" style="width: 100%; display: block; height: auto; pointer-events: none;">
         <div id="vtt-grid-camada" class="vtt-grid ${gridAtivo ? 'ativo' : ''}" style="background-size: ${vttGridTamanho}px ${vttGridTamanho}px; position: absolute; top:0; left:0; width:100%; height:100%; pointer-events: none;"></div>
@@ -1062,6 +1065,36 @@ function abrirVisualizadorImagem(url, categoria) {
   modal.style.display = 'flex';
 }
 
+// --- CONTROLE DE MODO IMERSIVO E ESPAÇO DO MAPA ---
+function alternarModoImersivoMapa() {
+  mapaModoImersivo = !mapaModoImersivo;
+  const topo = document.getElementById('topo-geral');
+  const painelMestre = document.getElementById('painel-upload-mestre');
+  const canvas = document.getElementById('vtt-canvas');
+  const btn = document.getElementById('btn-modo-imersivo');
+
+  if (mapaModoImersivo) {
+    if (topo) topo.style.display = 'none';
+    if (painelMestre) painelMestre.removeAttribute('open');
+    if (canvas) canvas.style.height = '80vh';
+    if (btn) {
+      btn.innerText = '🔙 Restaurar Interface';
+      btn.style.background = '#04d361';
+      btn.style.color = '#121214';
+    }
+    mostrarPopup('🔍 Modo Imersivo: Interface recolhida!');
+  } else {
+    if (topo) topo.style.display = 'block';
+    if (canvas) canvas.style.height = '55vh';
+    if (btn) {
+      btn.innerText = '📐 Maximizar Mapa';
+      btn.style.background = '#8257e5';
+      btn.style.color = '#fff';
+    }
+    mostrarPopup('📐 Interface restaurada.');
+  }
+}
+
 // --- SISTEMA DE TOASTS ---
 function mostrarPopup(texto) {
   let container = document.getElementById('toast-container');
@@ -1109,3 +1142,4 @@ window.rolarDado = rolarDado;
 window.rolarExpressaoPersonalizada = rolarExpressaoPersonalizada;
 window.fazerUploadImagem = fazerUploadImagem;
 window.alternarMovimentoMapa = alternarMovimentoMapa;
+window.alternarModoImersivoMapa = alternarModoImersivoMapa;

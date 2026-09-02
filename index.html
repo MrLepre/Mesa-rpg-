@@ -8,72 +8,131 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-  <div id="toast-container" class="toast-container"></div>
-
-  <header>
+  <header class="topo-mesa">
     <h1>Mesa Virtual - Crônicas de Camelot</h1>
-    
-    <!-- BARRA DE LOGIN POR NICK E SENHA -->
-    <div id="painel-auth" class="painel-auth">
-      <div id="form-login">
+    <div class="auth-container">
+      <div id="form-login" class="form-login">
         <input type="text" id="auth-nick" placeholder="Seu Nick / Nome">
-        <input type="password" id="auth-senha" placeholder="Sua Senha">
+        <input type="password" id="auth-senha" placeholder="Senha">
         <button onclick="fazerLogin()">Entrar</button>
         <button onclick="fazerCadastro()">Criar Conta</button>
       </div>
-
-      <div id="status-usuario" style="display: none;">
-        <span>Conectado: <strong id="user-nick-display"></strong> <span id="badge-mestre" style="display: none; background: #e55151; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; margin-left: 5px;">MESTRE</span></span>
-        <button onclick="fazerLogout()">Sair</button>
+      <div id="status-usuario" style="display: none; align-items: center; gap: 10px;">
+        <span style="color: #04d361;">Logado como: <strong id="user-nick-display"></strong></span>
+        <span id="badge-mestre" style="display: none; background: #c5a059; color: #121214; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold;">MESTRE</span>
+        <button onclick="fazerLogout()" style="background: #ff5252; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">Sair</button>
       </div>
     </div>
-
-    <nav class="abas-navegacao">
-      <button class="ativo" onclick="mudarAba('ficha', event)">Ficha do Personagem</button>
-      <button onclick="mudarAba('mapa', event)">Mapa</button>
-    </nav>
   </header>
 
-  <main class="mesa-container">
-    <!-- ABA FICHA -->
+  <nav class="abas-navegacao">
+    <button class="ativo" onclick="mudarAba('ficha', event)">Minha Ficha</button>
+    <button onclick="mudarAba('grupo', event)">Fichas do Grupo</button>
+    <button onclick="mudarAba('mapa', event)">Mapa</button>
+    <button onclick="mudarAba('rolagens', event)">Rolagens</button>
+    <button onclick="mudarAba('galeria', event)">Chat & Galeria</button>
+  </nav>
+
+  <main>
     <section id="aba-ficha" class="painel ativo">
-      <h2>Gestão do Personagem na Mesa</h2>
-      
-      <div class="box-importacao">
+      <h2>Minha Ficha do Personagem</h2>
+      <div class="card-secao">
         <h3>1. Importar Ficha Existente</h3>
-        <p style="font-size: 0.85rem; color: #a8a8b3; margin-bottom: 0.5rem;">Selecione o arquivo .json gerado na sua ficha local:</p>
+        <p>Selecione o arquivo .json gerado na sua ficha local:</p>
         <input type="file" id="arquivo-json" accept=".json" onchange="importarArquivoJSON(event)">
-
-        <hr style="border-color: #29292e; margin: 1rem 0;">
-
-        <h3>2. Sincronização em Nuvem</h3>
-        <button class="btn-salvar" onclick="salvarFichaNoSupabase()">💾 Salvar/Atualizar Ficha na Nuvem</button>
       </div>
-
-      <div id="container-ficha-carregada" class="container-ficha">
-        <p style="color: #a8a8b3;">Faça login e importe seu arquivo .json para carregar seus dados aqui.</p>
+      <div class="card-secao" style="margin-top: 15px;">
+        <h3>2. Sincronização em Nuvem</h3>
+        <button onclick="salvarFichaNoSupabase()" style="background: #04d361; color: #121214; font-weight: bold; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer;">Salvar/Atualizar Ficha na Nuvem</button>
+      </div>
+      <div id="container-ficha-carregada" style="margin-top: 20px;">
+        <p style="color: #a8a8b3;">Faça login e importe um arquivo JSON para visualizar sua ficha.</p>
       </div>
     </section>
 
-    <!-- ABA MAPA -->
+    <section id="aba-grupo" class="painel">
+      <h2>Fichas dos Cavaleiros da Távola</h2>
+      <button onclick="carregarFichasDoGrupo()" style="background: #8257e5; color: #fff; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; margin-bottom: 15px;">Atualizar Lista do Grupo</button>
+      <div id="lista-fichas-grupo">
+        <p style="color: #a8a8b3;">Carregando fichas...</p>
+      </div>
+    </section>
+
     <section id="aba-mapa" class="painel">
-      <h2>Mapa de Batalha</h2>
-      
-      <!-- Painel exclusivo do Mestre -->
-      <div id="painel-mestre-mapa" class="painel-mestre-mapa" style="display: none;">
-        <label for="url-novo-mapa"> Painel do Mestre (URL da Imagem do Mapa):</label>
-        <div class="input-mapa-group">
-          <input type="text" id="url-novo-mapa" placeholder="https://exemplo.com/imagem-do-mapa.jpg">
-          <button onclick="atualizarMapaParaTodos()">Enviar Mapa</button>
+      <h2>Mapa Tático e Mini-VTT</h2>
+      <div id="painel-upload-mestre" style="display: none; background: #202024; padding: 15px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #c5a059;">
+        <h3 style="color: #c5a059; margin-bottom: 8px;">Painel do Mestre: Enviar Novo Mapa</h3>
+        <input type="file" id="arquivo-mapa" accept="image/*" style="margin-bottom: 10px; display: block;">
+        <button onclick="fazerUploadMapa()" style="background: #c5a059; color: #121214; font-weight: bold; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer;">Publicar Mapa para o Grupo</button>
+      </div>
+      <div id="container-mapa">
+        <p style="color: #a8a8b3;">Nenhum mapa carregado no momento.</p>
+      </div>
+    </section>
+
+    <section id="aba-rolagens" class="painel">
+      <h2>Salão de Rolagens de Dados</h2>
+      <div style="background: #202024; padding: 15px; border-radius: 6px; margin-bottom: 15px;">
+        <h3>Rolagem Rápida</h3>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
+          <button onclick="rolarDado(4)">d4</button>
+          <button onclick="rolarDado(6)">d6</button>
+          <button onclick="rolarDado(8)">d8</button>
+          <button onclick="rolarDado(10)">d10</button>
+          <button onclick="rolarDado(12)">d12</button>
+          <button onclick="rolarDado(20)">d20</button>
+          <button onclick="rolarDado(100)">d100</button>
         </div>
       </div>
+      <div style="background: #202024; padding: 15px; border-radius: 6px; margin-bottom: 15px;">
+        <h3>Expressão Personalizada</h3>
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+          <input type="text" id="expressao-dado" placeholder="ex: 2d20+5" style="flex: 1; padding: 8px; background: #121214; border: 1px solid #29292e; color: #fff; border-radius: 4px;">
+          <button onclick="rolarExpressaoPersonalizada()" style="background: #8257e5; color: #fff; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;">Rolar</button>
+        </div>
+      </div>
+      <div>
+        <h3>Histórico de Rolagens</h3>
+        <div id="historico-rolagens" style="margin-top: 10px; max-height: 250px; overflow-y: auto;">
+          <p style="color: #a8a8b3;">Nenhuma rolagem realizada ainda.</p>
+        </div>
+      </div>
+    </section>
 
-      <div id="container-mapa" class="container-mapa">
-        <p id="mapa-vazio-texto" style="color: #a8a8b3;">Nenhum mapa carregado no momento.</p>
-        <img id="img-mapa" src="" alt="Mapa de Batalha" style="display: none;">
+    <section id="aba-galeria" class="painel">
+      <h2>Galeria e Recursos Visuais</h2>
+      <div style="background: #202024; padding: 15px; border-radius: 6px; margin-bottom: 15px;">
+        <h3>Enviar Imagem</h3>
+        <input type="file" id="arquivo-imagem" accept="image/*" style="margin-bottom: 10px; display: block;">
+        <select id="categoria-imagem" style="margin-bottom: 10px; padding: 6px; background: #121214; color: #fff; border: 1px solid #29292e; border-radius: 4px;">
+          <option value="Personagens">Personagens</option>
+          <option value="Locais">Locais</option>
+          <option value="Itens">Itens</option>
+          <option value="Inimigos">Inimigos</option>
+          <option value="Outros">Outros</option>
+        </select>
+        <button onclick="fazerUploadImagem()" style="background: #8257e5; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; display: block;">Enviar para Galeria</button>
+      </div>
+      <div>
+        <h3>Galeria Geral</h3>
+        <div id="galeria-grid">
+          <p style="color: #a8a8b3;">Carregando galeria...</p>
+        </div>
       </div>
     </section>
   </main>
+
+  <div id="modal-ficha-grupo" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 9998; justify-content: center; align-items: center; padding: 20px;">
+    <div style="background: #121214; width: 100%; max-width: 700px; border-radius: 6px; border: 2px solid #c5a059; overflow: hidden; display: flex; flex-direction: column;">
+      <div style="background: #1a1d26; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #c5a059;">
+        <h2 id="modal-titulo-personagem" style="color: #f3d075; font-size: 1.2rem; margin: 0;">Ficha do Cavaleiro</h2>
+        <button onclick="fecharModalFichaGrupo()" style="background: #ff5252; color: #fff; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-weight: bold;">✕ Fechar</button>
+      </div>
+      <div id="modal-conteudo-ficha" style="padding: 20px; overflow-y: auto; max-height: 80vh;"></div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
 
   <script src="app.js"></script>
 </body>

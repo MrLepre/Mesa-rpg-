@@ -8,30 +8,33 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-  <header class="topo-mesa">
-    <h1>Mesa Virtual - Crônicas de Camelot</h1>
-    <div class="auth-container">
-      <div id="form-login" class="form-login">
-        <input type="text" id="auth-nick" placeholder="Seu Nick / Nome">
-        <input type="password" id="auth-senha" placeholder="Senha">
-        <button onclick="fazerLogin()">Entrar</button>
-        <button onclick="fazerCadastro()">Criar Conta</button>
+  <!-- Container da interface superior para permitir occultação/expansão -->
+  <div id="topo-geral">
+    <header class="topo-mesa">
+      <h1>Mesa Virtual - Crônicas de Camelot</h1>
+      <div class="auth-container">
+        <div id="form-login" class="form-login">
+          <input type="text" id="auth-nick" placeholder="Seu Nick / Nome">
+          <input type="password" id="auth-senha" placeholder="Senha">
+          <button onclick="fazerLogin()">Entrar</button>
+          <button onclick="fazerCadastro()">Criar Conta</button>
+        </div>
+        <div id="status-usuario" style="display: none; align-items: center; gap: 10px;">
+          <span style="color: #04d361;">Logado como: <strong id="user-nick-display"></strong></span>
+          <span id="badge-mestre" style="display: none; background: #c5a059; color: #121214; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold;">MESTRE</span>
+          <button onclick="fazerLogout()" style="background: #ff5252; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">Sair</button>
+        </div>
       </div>
-      <div id="status-usuario" style="display: none; align-items: center; gap: 10px;">
-        <span style="color: #04d361;">Logado como: <strong id="user-nick-display"></strong></span>
-        <span id="badge-mestre" style="display: none; background: #c5a059; color: #121214; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold;">MESTRE</span>
-        <button onclick="fazerLogout()" style="background: #ff5252; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">Sair</button>
-      </div>
-    </div>
-  </header>
+    </header>
 
-  <nav class="abas-navegacao">
-    <button class="ativo" onclick="mudarAba('ficha', event)">Minha Ficha</button>
-    <button onclick="mudarAba('grupo', event)">Fichas do Grupo</button>
-    <button onclick="mudarAba('mapa', event)">Mapa</button>
-    <button onclick="mudarAba('rolagens', event)">Rolagens</button>
-    <button onclick="mudarAba('galeria', event)">Chat & Galeria</button>
-  </nav>
+    <nav class="abas-navegacao">
+      <button class="ativo" onclick="mudarAba('ficha', event)">Minha Ficha</button>
+      <button onclick="mudarAba('grupo', event)">Fichas do Grupo</button>
+      <button onclick="mudarAba('mapa', event)">Mapa</button>
+      <button onclick="mudarAba('rolagens', event)">Rolagens</button>
+      <button onclick="mudarAba('galeria', event)">Chat & Galeria</button>
+    </nav>
+  </div>
 
   <main>
     <section id="aba-ficha" class="painel ativo">
@@ -59,12 +62,24 @@
     </section>
 
     <section id="aba-mapa" class="painel">
-      <h2>Mapa Tático e Mini-VTT</h2>
-      <div id="painel-upload-mestre" style="display: none; background: #202024; padding: 15px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #c5a059;">
-        <h3 style="color: #c5a059; margin-bottom: 8px;">Painel do Mestre: Enviar Novo Mapa</h3>
-        <input type="file" id="arquivo-mapa" accept="image/*" style="margin-bottom: 10px; display: block;">
-        <button onclick="fazerUploadMapa()" style="background: #c5a059; color: #121214; font-weight: bold; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer;">Publicar Mapa para o Grupo</button>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+        <h2 style="margin: 0;">Mapa Tático e Mini-VTT</h2>
+        <button onclick="alternarModoImersivoMapa()" id="btn-modo-imersivo" style="background: #8257e5; color: #fff; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.85rem;">
+          📐 Maximizar Mapa
+        </button>
       </div>
+
+      <!-- Painel retrátil usando a tag <details> -->
+      <details id="painel-upload-mestre" style="display: none; background: #202024; padding: 10px 15px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #c5a059;">
+        <summary style="color: #c5a059; font-weight: bold; cursor: pointer; font-size: 0.95rem; user-select: none;">
+          👑 Painel do Mestre: Enviar Novo Mapa (clique para recolher/expandir)
+        </summary>
+        <div style="margin-top: 12px; border-top: 1px solid #29292e; padding-top: 10px;">
+          <input type="file" id="arquivo-mapa" accept="image/*" style="margin-bottom: 10px; display: block;">
+          <button onclick="fazerUploadMapa()" style="background: #c5a059; color: #121214; font-weight: bold; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer;">Publicar Mapa para o Grupo</button>
+        </div>
+      </details>
+
       <div id="container-mapa">
         <p style="color: #a8a8b3;">Nenhum mapa carregado no momento.</p>
       </div>

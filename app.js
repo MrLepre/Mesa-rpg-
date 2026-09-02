@@ -1,5 +1,5 @@
 // ==========================================
-// CRÔNICAS DE CAMELOT - APP.JS
+// CRÔNICAS DE CAMELOT - APP.JS COMPLETO UNIFICADO
 // ==========================================
 
 const SUPABASE_URL = 'https://rolrbrtpqbchyxmjmvzr.supabase.co';
@@ -13,13 +13,13 @@ let vttZoom = 100;
 let vttGridTamanho = 40;
 let ehMestreGlobal = false;
 
-// Variáveis de controle de Posição (Pan) e Cadeado do Mapa
+// Controle de Pan e Cadeado do Mapa
 let vttPanX = 0;
 let vttPanY = 0;
 let vttMovimentoLivre = false;
 let mapaModoImersivo = false;
 
-// Inicialização segura
+// Inicialização segura do Supabase
 try {
   if (window.supabase) {
     supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -76,12 +76,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             false
           );
         })
-        .subscribe();
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('Conectado em tempo real!');
+          }
+        });
 
       carregarMapaAtual();
       carregarGaleria();
     } catch (err) {
-      console.error('Erro na sessão/conexão:', err);
+      console.error('Erro na conexão:', err);
     }
   }
 });
@@ -162,7 +166,6 @@ async function fazerLogout() {
 function atualizarInterfaceAuth(user) {
   const formLogin = document.getElementById('form-login');
   const statusUsuario = document.getElementById('status-usuario');
-  const painelMapaMestre = document.getElementById('painel-mapa-mestre');
   const painelUploadMestre = document.getElementById('painel-upload-mestre');
   const badgeMestre = document.getElementById('badge-mestre');
 
@@ -177,18 +180,15 @@ function atualizarInterfaceAuth(user) {
     ehMestreGlobal = nickExibicao.toLowerCase() === 'mestre';
     if (ehMestreGlobal) {
       if (badgeMestre) badgeMestre.style.display = 'inline-block';
-      if (painelMapaMestre) painelMapaMestre.style.display = 'block';
       if (painelUploadMestre) painelUploadMestre.style.display = 'block';
     } else {
       if (badgeMestre) badgeMestre.style.display = 'none';
-      if (painelMapaMestre) painelMapaMestre.style.display = 'none';
       if (painelUploadMestre) painelUploadMestre.style.display = 'none';
     }
   } else {
     ehMestreGlobal = false;
     if (formLogin) formLogin.style.display = 'flex';
     if (statusUsuario) statusUsuario.style.display = 'none';
-    if (painelMapaMestre) painelMapaMestre.style.display = 'none';
     if (painelUploadMestre) painelUploadMestre.style.display = 'none';
   }
 }
@@ -288,9 +288,7 @@ async function carregarFichasDoGrupo() {
   if (!lista) return;
   lista.innerHTML = '<p style="color: #a8a8b3;">Carregando fichas dos cavaleiros...</p>';
 
-  const { data, error } = await supabaseClient
-    .from('fichas')
-    .select('*');
+  const { data, error } = await supabaseClient.from('fichas').select('*');
 
   if (error || !data || data.length === 0) {
     lista.innerHTML = '<p style="color: #a8a8b3;">Nenhuma ficha encontrada no grupo.</p>';
@@ -298,22 +296,17 @@ async function carregarFichasDoGrupo() {
   }
 
   lista.innerHTML = '';
-  
   data.forEach((item) => {
     const card = document.createElement('div');
     card.style.cssText = 'background: #202024; padding: 1rem; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #29292e; margin-bottom: 8px;';
     
     const infoDiv = document.createElement('div');
-    const nomeCavaleiro = item.nome_personagem || 'Cavaleiro Desconhecido';
-    infoDiv.innerHTML = `<strong style="color: #fff; font-size: 1.1rem;">${nomeCavaleiro}</strong>`;
+    infoDiv.innerHTML = `<strong style="color: #fff; font-size: 1.1rem;">${item.nome_personagem || 'Cavaleiro'}</strong>`;
     
     const botaoVer = document.createElement('button');
     botaoVer.innerText = 'Ver Ficha';
     botaoVer.style.cssText = 'background: #8257e5; color: #fff; border: none; padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font-weight: bold;';
-    
-    botaoVer.onclick = () => {
-      abrirFichaGrupo(item.dados_ficha);
-    };
+    botaoVer.onclick = () => abrirFichaGrupo(item.dados_ficha);
 
     card.appendChild(infoDiv);
     card.appendChild(botaoVer);
@@ -325,12 +318,36 @@ function abrirFichaGrupo(dados) {
   const tituloElem = document.getElementById('modal-titulo-personagem');
   if (tituloElem) tituloElem.innerText = dados.nome || dados.personagem_nome || 'Personagem';
   
+  const formatarValorOuObjeto = (val) => {
+    if (!val) return '-';
+    if (typeof val === 'object') {
+      return Object.entries(val).map(([k, v]) => `<strong>${k}:</strong> ${v}`).join(' | ');
+    }
+    return val;
+  };
+
+  const periciasHTML = dados.pericias || dados.grimorio_pericias ? (() => {
+    const periciasObj = dados.pericias || dados.grimorio_pericias;
+    if (typeof periciasObj === 'object') {
+      return Object.entries(periciasObj).map(([k, v]) => `<div style="background: #0b0d12; padding: 6px 10px; border: 1px solid #4a3d24; border-radius: 4px; font-size: 0.9rem;"><span style="color: #f3d075;">${k}:</span> ${v}</div>`).join('');
+    }
+    return `<div style="background: #0b0d12; padding: 6px 10px; border: 1px solid #4a3d24; border-radius: 4px;">${periciasObj}</div>`;
+  })() : '<span style="color: #a8a8b3;">Nenhuma perícia registrada.</span>';
+
+  const sinergiaHTML = dados.sinergia_elemental || dados.elementos ? (() => {
+    const elemObj = dados.sinergia_elemental || dados.elementos;
+    if (typeof elemObj === 'object') {
+      return Object.entries(elemObj).map(([k, v]) => `<div style="background: #0b0d12; padding: 6px; border: 1px solid #4a3d24; border-radius: 4px; text-align: center;"><span style="font-size: 0.75rem; color: #e6ca88; text-transform: uppercase;">${k}</span><br><strong style="font-size: 1.1rem;">${v}</strong></div>`).join('');
+    }
+    return '';
+  })() : '';
+
   const conteudoModal = document.getElementById('modal-conteudo-ficha');
   if (conteudoModal) {
     conteudoModal.innerHTML = `
-      <div style="background-color: #151821; border: 2px solid #c5a059; padding: 15px; border-radius: 6px; color: #e2d9c5; font-family: 'EB Garamond', serif; max-height: 80vh; overflow-y: auto;">
+      <div style="background-color: #151821; border: 2px solid #c5a059; padding: 20px; border-radius: 6px; color: #e2d9c5; font-family: 'EB Garamond', serif; max-height: 80vh; overflow-y: auto;">
         
-        <div style="display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 15px; border-bottom: 1px solid #4a3d24; padding-bottom: 15px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; border-bottom: 1px solid #4a3d24; padding-bottom: 15px;">
           <div>
             <strong style="color: #f3d075; font-family: 'Cinzel', serif;">Nome do Cavaleiro:</strong> 
             <div style="background: #0b0d12; padding: 8px; border: 1px solid #4a3d24; border-radius: 4px; margin-top: 4px;">${dados.nome || dados.personagem_nome || '-'}</div>
@@ -343,10 +360,14 @@ function abrirFichaGrupo(dados) {
             <strong style="color: #f3d075; font-family: 'Cinzel', serif;">Tipo Humano (Raça):</strong> 
             <div style="background: #0b0d12; padding: 8px; border: 1px solid #4a3d24; border-radius: 4px; margin-top: 4px;">${dados.tipo_humano || dados.raca || '-'}</div>
           </div>
+          <div>
+            <strong style="color: #f3d075; font-family: 'Cinzel', serif;">Antecedente:</strong> 
+            <div style="background: #0b0d12; padding: 8px; border: 1px solid #4a3d24; border-radius: 4px; margin-top: 4px;">${dados.antecedente || '-'}</div>
+          </div>
         </div>
 
         <h3 style="color: #f3d075; font-family: 'Cinzel', serif; font-size: 1.1rem; margin-bottom: 8px;">Atributos Vitais</h3>
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 15px;">
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 15px;">
           <div style="background: #0b0d12; padding: 8px; border: 1px solid #4a3d24; border-radius: 4px; text-align: center;">
             <span style="font-size: 0.8rem; color: #e6ca88;">Vida</span><br><strong style="font-size: 1.2rem; color: #ff5252;">${dados.vida || dados.hp || 0}</strong>
           </div>
@@ -362,7 +383,7 @@ function abrirFichaGrupo(dados) {
         </div>
 
         <h3 style="color: #f3d075; font-family: 'Cinzel', serif; font-size: 1.1rem; margin-bottom: 8px;">Atributos Primários</h3>
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 15px;">
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px;">
           <div style="background: #0b0d12; padding: 8px; border: 1px solid #4a3d24; border-radius: 4px; text-align: center;">
             <span style="font-size: 0.8rem; color: #e6ca88;">Força</span><br><strong style="font-size: 1.2rem;">${dados.attr_forca || dados.forca || 1}</strong>
           </div>
@@ -374,6 +395,35 @@ function abrirFichaGrupo(dados) {
           </div>
           <div style="background: #0b0d12; padding: 8px; border: 1px solid #4a3d24; border-radius: 4px; text-align: center;">
             <span style="font-size: 0.8rem; color: #e6ca88;">Inteligência</span><br><strong style="font-size: 1.2rem;">${dados.attr_inteligencia || dados.inteligencia || 1}</strong>
+          </div>
+          <div style="background: #0b0d12; padding: 8px; border: 1px solid #4a3d24; border-radius: 4px; text-align: center;">
+            <span style="font-size: 0.8rem; color: #e6ca88;">Sabedoria</span><br><strong style="font-size: 1.2rem;">${dados.attr_sabedoria || dados.sabedoria || 1}</strong>
+          </div>
+          <div style="background: #0b0d12; padding: 8px; border: 1px solid #4a3d24; border-radius: 4px; text-align: center;">
+            <span style="font-size: 0.8rem; color: #e6ca88;">Carisma</span><br><strong style="font-size: 1.2rem;">${dados.attr_carisma || dados.carisma || 1}</strong>
+          </div>
+        </div>
+
+        ${sinergiaHTML ? `
+          <h3 style="color: #f3d075; font-family: 'Cinzel', serif; font-size: 1rem; margin-bottom: 6px;">Sinergia Elemental</h3>
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 15px;">
+            ${sinergiaHTML}
+          </div>
+        ` : ''}
+
+        <h3 style="color: #f3d075; font-family: 'Cinzel', serif; font-size: 1.1rem; margin-bottom: 8px;">Grimório de Perícias</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px;">
+          ${periciasHTML}
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 15px;">
+          <div style="background: #0b0d12; padding: 10px; border: 1px solid #4a3d24; border-radius: 4px;">
+            <strong style="color: #f3d075; font-family: 'Cinzel', serif;">História / Origem:</strong>
+            <p style="margin: 5px 0 0 0; white-space: pre-wrap; font-size: 0.95rem; color: #a8a8b3;">${dados.historia || dados.origem_passado || 'Não registrada.'}</p>
+          </div>
+          <div style="background: #0b0d12; padding: 10px; border: 1px solid #4a3d24; border-radius: 4px;">
+            <strong style="color: #f3d075; font-family: 'Cinzel', serif;">Inventário:</strong>
+            <p style="margin: 5px 0 0 0; white-space: pre-wrap; font-size: 0.95rem; color: #a8a8b3;">${formatarValorOuObjeto(dados.inventario || dados.alforge)}</p>
           </div>
         </div>
 
@@ -389,7 +439,7 @@ function fecharModalFichaGrupo() {
   if (modalGrupo) modalGrupo.style.display = 'none';
 }
 
-// --- MAPA E MINI-VTT (OTIMIZADO PARA MOBILE) ---
+// --- MAPA E MINI-VTT ---
 async function fazerUploadMapa() {
   if (!supabaseClient) return alert('Supabase não conectado.');
   const input = document.getElementById('arquivo-mapa');
@@ -398,15 +448,10 @@ async function fazerUploadMapa() {
   const file = input.files[0];
   const fileName = `mapa_${Date.now()}.${file.name.split('.').pop()}`;
 
-  const { error } = await supabaseClient.storage
-    .from('galeria')
-    .upload(fileName, file);
-
+  const { error } = await supabaseClient.storage.from('galeria').upload(fileName, file);
   if (error) return alert('Erro ao subir imagem: ' + error.message);
 
-  const { data } = supabaseClient.storage
-    .from('galeria')
-    .getPublicUrl(fileName);
+  const { data } = supabaseClient.storage.from('galeria').getPublicUrl(fileName);
   const publicUrl = data.publicUrl;
 
   await supabaseClient.from('mapas').upsert({ id: 1, url_mapa: publicUrl });
@@ -424,6 +469,15 @@ async function carregarMapaAtual() {
   if (data && data.url_mapa) {
     exibirMapaNaTela(data.url_mapa);
   }
+}
+
+function alternarModoImersivoMapa() {
+  mapaModoImersivo = !mapaModoImersivo;
+  const btn = document.getElementById('btn-modo-imersivo');
+  const canvas = document.getElementById('vtt-canvas');
+
+  if (btn) btn.innerText = mapaModoImersivo ? '📉 Restaurar Mapa' : '📐 Maximizar Mapa';
+  if (canvas) canvas.style.height = mapaModoImersivo ? '80vh' : '55vh';
 }
 
 function exibirMapaNaTela(url) {
@@ -479,7 +533,6 @@ function exibirMapaNaTela(url) {
   configurarPanMapa();
 }
 
-// Configura o arrasto (Pan) do mapa para o Mestre quando destravado
 function configurarPanMapa() {
   const canvas = document.getElementById('vtt-canvas');
   if (!canvas) return;
@@ -958,7 +1011,6 @@ function registrarRolagemHistorico(descricao, resultado, veioDoBroadcast = false
 
 // --- GALERIA & IMAGENS ---
 async function fazerUploadImagem() {
-  if (!supabaseClient) return alert('Supabase não conectado.');
   const input = document.getElementById('arquivo-imagem');
   const categoriaSelect = document.getElementById('categoria-imagem');
   if (!input || !input.files || input.files.length === 0) return alert('Selecione uma imagem!');
@@ -992,47 +1044,20 @@ async function carregarGaleria() {
     .select('*')
     .order('criado_em', { ascending: false });
 
-  if (error) return;
-
-  const categorias = ['Personagens', 'Locais', 'Itens', 'Inimigos', 'Outros'];
-
-  categorias.forEach(cat => {
-    const container = document.getElementById(`galeria-${cat.toLowerCase()}`) || 
-                      document.getElementById(`grid-${cat.toLowerCase()}`);
-    
-    if (container) {
-      const imgsCat = data ? data.filter(img => img.categoria && img.categoria.toLowerCase() === cat.toLowerCase()) : [];
-      
-      if (imgsCat.length === 0) {
-        container.innerHTML = `<p style="color: #a8a8b3; font-size: 0.8rem; padding: 5px;">[${cat}]</p>`;
-      } else {
-        container.innerHTML = '';
-        container.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; padding: 8px;';
-        imgsCat.forEach(img => {
-          const card = document.createElement('div');
-          card.style.cssText = 'background: #202024; border: 1px solid #29292e; border-radius: 6px; overflow: hidden; cursor: pointer;';
-          card.innerHTML = `
-            <img src="${img.url}" alt="${img.categoria}" style="width: 100%; height: 90px; object-fit: cover; display: block;" onerror="this.src='https://via.placeholder.com/120?text=Erro'">
-          `;
-          card.onclick = () => abrirVisualizadorImagem(img.url, img.categoria);
-          container.appendChild(card);
-        });
-      }
-    }
-  });
+  if (error) return console.error('Erro galeria:', error);
 
   const gridGeral = document.getElementById('galeria-grid');
   if (gridGeral) {
-    gridGeral.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-top: 10px;';
+    gridGeral.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 15px;';
     if (!data || data.length === 0) {
-      gridGeral.innerHTML = '<p style="color: #a8a8b3; font-size: 0.9rem;">Nenhuma imagem na galeria.</p>';
+      gridGeral.innerHTML = '<p style="color: #a8a8b3;">Nenhuma imagem na galeria ainda.</p>';
     } else {
       gridGeral.innerHTML = '';
       data.forEach(img => {
         const card = document.createElement('div');
         card.style.cssText = 'background: #202024; border: 1px solid #29292e; border-radius: 6px; overflow: hidden; cursor: pointer;';
         card.innerHTML = `
-          <img src="${img.url}" alt="${img.categoria}" style="width: 100%; height: 110px; object-fit: cover; display: block;" onerror="this.src='https://via.placeholder.com/150?text=Erro'">
+          <img src="${img.url}" alt="${img.categoria}" style="width: 100%; height: 110px; object-fit: cover; display: block;" onerror="this.src='https://via.placeholder.com/110?text=Erro'">
           <div style="padding: 0.3rem; font-size: 0.75rem; color: #04d361; text-align: center; background: #121214;">[${img.categoria}]</div>
         `;
         card.onclick = () => abrirVisualizadorImagem(img.url, img.categoria);
@@ -1047,12 +1072,12 @@ function abrirVisualizadorImagem(url, categoria) {
   if (!modal) {
     modal = document.createElement('div');
     modal.id = 'modal-visualizador-img';
-    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; padding: 15px; box-sizing: border-box;';
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; padding: 20px;';
     modal.innerHTML = `
-      <div style="position: relative; max-width: 95%; max-height: 85vh; text-align: center;">
-        <button onclick="document.getElementById('modal-visualizador-img').style.display='none'" style="position: absolute; top: -35px; right: 0; background: #ff5252; color: #fff; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.85rem;">✕ Fechar</button>
-        <img id="img-ampliada" src="" alt="Zoom" style="max-width: 100%; max-height: 75vh; border-radius: 6px; border: 2px solid #8257e5;">
-        <div id="legenda-ampliada" style="color: #fff; margin-top: 8px; font-weight: bold; font-size: 1rem;"></div>
+      <div style="position: relative; max-width: 90%; max-height: 85vh; text-align: center;">
+        <button onclick="document.getElementById('modal-visualizador-img').style.display='none'" style="position: absolute; top: -40px; right: 0; background: #ff5252; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold;">✕ Fechar</button>
+        <img id="img-ampliada" src="" alt="Zoom" style="max-width: 100%; max-height: 80vh; border-radius: 6px; border: 2px solid #8257e5;">
+        <div id="legenda-ampliada" style="color: #fff; margin-top: 10px; font-weight: bold; font-size: 1.1rem;"></div>
       </div>
     `;
     document.body.appendChild(modal);
@@ -1065,81 +1090,24 @@ function abrirVisualizadorImagem(url, categoria) {
   modal.style.display = 'flex';
 }
 
-// --- CONTROLE DE MODO IMERSIVO E ESPAÇO DO MAPA ---
-function alternarModoImersivoMapa() {
-  mapaModoImersivo = !mapaModoImersivo;
-  const topo = document.getElementById('topo-geral');
-  const painelMestre = document.getElementById('painel-upload-mestre');
-  const canvas = document.getElementById('vtt-canvas');
-  const btn = document.getElementById('btn-modo-imersivo');
-
-  if (mapaModoImersivo) {
-    if (topo) topo.style.display = 'none';
-    if (painelMestre) painelMestre.removeAttribute('open');
-    if (canvas) canvas.style.height = '80vh';
-    if (btn) {
-      btn.innerText = '🔙 Restaurar Interface';
-      btn.style.background = '#04d361';
-      btn.style.color = '#121214';
-    }
-    mostrarPopup('🔍 Modo Imersivo: Interface recolhida!');
-  } else {
-    if (topo) topo.style.display = 'block';
-    if (canvas) canvas.style.height = '55vh';
-    if (btn) {
-      btn.innerText = '📐 Maximizar Mapa';
-      btn.style.background = '#8257e5';
-      btn.style.color = '#fff';
-    }
-    mostrarPopup('📐 Interface restaurada.');
-  }
-}
-
 // --- SISTEMA DE TOASTS ---
 function mostrarPopup(texto) {
   let container = document.getElementById('toast-container');
   if (!container) {
     container = document.createElement('div');
     container.id = 'toast-container';
-    container.style.cssText = 'position: fixed; top: 10px; right: 10px; z-index: 99999; display: flex; flex-direction: column; gap: 5px;';
     document.body.appendChild(container);
   }
 
   const toast = document.createElement('div');
-  toast.style.cssText = 'background: #18181b; color: #fff; border: 1px solid #8257e5; padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; align-items: center; gap: 8px;';
+  toast.className = 'toast';
   toast.innerHTML = `<span>⚔️</span> <span>${texto}</span>`;
   container.appendChild(toast);
 
   setTimeout(() => {
     toast.style.opacity = '0';
-    toast.style.transition = 'opacity 0.3s ease';
+    toast.style.transform = 'translateX(100%)';
+    toast.style.transition = 'all 0.3s ease';
     setTimeout(() => toast.remove(), 300);
-  }, 3500);
+  }, 4000);
 }
-
-// ==========================================
-// EXPORTAÇÕES GLOBAIS
-// ==========================================
-window.fazerLogin = fazerLogin;
-window.fazerCadastro = fazerCadastro;
-window.fazerLogout = fazerLogout;
-window.mudarAba = mudarAba;
-window.importarArquivoJSON = importarArquivoJSON;
-window.salvarFichaNoSupabase = salvarFichaNoSupabase;
-window.carregarFichasDoGrupo = carregarFichasDoGrupo;
-window.abrirFichaGrupo = abrirFichaGrupo;
-window.fecharModalFichaGrupo = fecharModalFichaGrupo;
-window.fazerUploadMapa = fazerUploadMapa;
-window.alternarGridVTT = alternarGridVTT;
-window.alterarZoomMaster = alterarZoomMaster;
-window.atualizarTransformMapaVTT = atualizarTransformMapaVTT;
-window.ajustarGridTamanhoVTT = ajustarGridTamanhoVTT;
-window.darPingNoMapa = darPingNoMapa;
-window.abrirModalConfigToken = abrirModalConfigToken;
-window.selecionarImgToken = selecionarImgToken;
-window.confirmarCriacaoToken = confirmarCriacaoToken;
-window.rolarDado = rolarDado;
-window.rolarExpressaoPersonalizada = rolarExpressaoPersonalizada;
-window.fazerUploadImagem = fazerUploadImagem;
-window.alternarMovimentoMapa = alternarMovimentoMapa;
-window.alternarModoImersivoMapa = alternarModoImersivoMapa;

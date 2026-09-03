@@ -1,0 +1,1331 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crônicas de Camelot — Ficha Integrada à Mesa</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=Cinzel:wght@500;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #080a0f;
+            --panel-bg: #151821; 
+            --border-gold: #c5a059; 
+            --border-gold-light: #e6ca88;
+            --accent-gold: #f3d075; 
+            --text-color: #e2d9c5; 
+            --input-bg: #0b0d12;
+            --iron-dark: #1b202c;
+            --shadow-mystic: rgba(197, 160, 89, 0.15);
+        }
+
+        /* Correções essenciais para responsividade mobile total */
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'EB Garamond', serif;
+            margin: 0;
+            padding: 15px 10px;
+            background-image: 
+                radial-gradient(circle at 50% 0%, #1f2738 0%, #080a0f 70%),
+                repeating-linear-gradient(45deg, rgba(197,160,89,0.02) 0px, rgba(197,160,89,0.02) 2px, transparent 2px, transparent 40px);
+            overflow-x: hidden;
+        }
+
+        .ficha-container {
+            max-width: 1050px;
+            width: 100%;
+            margin: 0 auto;
+            border: 2px solid var(--border-gold);
+            background-color: var(--panel-bg);
+            padding: 15px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.9);
+            border-radius: 6px;
+            position: relative;
+        }
+
+        @media (min-width: 768px) {
+            .ficha-container {
+                padding: 35px;
+                border-width: 3px;
+                box-shadow: 0 0 40px rgba(0,0,0,0.9), inset 0 0 30px rgba(197, 160, 89, 0.05);
+            }
+        }
+
+        .ficha-container::before, .ficha-container::after {
+            content: "⚜️";
+            position: absolute;
+            color: var(--border-gold);
+            font-size: 1.2em;
+        }
+        .ficha-container::before { top: 8px; left: 10px; }
+        .ficha-container::after { top: 8px; right: 10px; }
+
+        header {
+            text-align: center;
+            border-bottom: 2px solid var(--border-gold);
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        h1 {
+            font-family: 'Cinzel Decorative', cursive;
+            color: var(--accent-gold);
+            margin: 0 0 6px 0;
+            letter-spacing: 2px;
+            font-size: 1.6em;
+            text-shadow: 2px 2px 6px rgba(0,0,0,0.8);
+        }
+
+        @media (min-width: 768px) {
+            h1 {
+                font-size: 2.5em;
+                letter-spacing: 4px;
+            }
+        }
+
+        .subtitulo {
+            font-family: 'Cinzel', serif;
+            font-style: italic;
+            color: var(--border-gold-light);
+            margin-bottom: 12px;
+            font-size: 0.9em;
+            letter-spacing: 0.5px;
+        }
+
+        @media (min-width: 768px) {
+            .subtitulo {
+                font-size: 1.1em;
+                letter-spacing: 1px;
+            }
+        }
+
+        .botoes-topo {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            font-family: 'Cinzel', serif;
+            background: linear-gradient(to bottom, #1d1912, #100e0a);
+            color: var(--accent-gold);
+            border: 1px solid var(--border-gold);
+            padding: 6px 12px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.75em;
+            letter-spacing: 0.5px;
+            transition: all 0.3s ease;
+            border-radius: 3px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            flex: 1 1 auto;
+            min-width: 120px;
+        }
+
+        @media (min-width: 768px) {
+            button {
+                padding: 8px 18px;
+                font-size: 0.85em;
+                letter-spacing: 1px;
+                flex: initial;
+            }
+        }
+
+        button:hover {
+            background: linear-gradient(to bottom, var(--border-gold), #997839);
+            color: #080a0f;
+            box-shadow: 0 0 12px var(--border-gold);
+            border-color: #fff;
+        }
+
+        .grid-dados-gerais {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        @media (min-width: 768px) {
+            .grid-dados-gerais {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 18px;
+                margin-bottom: 30px;
+            }
+        }
+
+        .campo-texto {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+
+        .campo-texto label {
+            font-family: 'Cinzel', serif;
+            font-size: 0.8em;
+            color: var(--border-gold-light);
+            margin-bottom: 4px;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        @media (min-width: 768px) {
+            .campo-texto label {
+                font-size: 0.85em;
+                letter-spacing: 1.5px;
+                margin-bottom: 6px;
+            }
+        }
+
+        input[type="text"], input[type="number"], select, textarea {
+            background-color: var(--input-bg);
+            border: 1px solid #4a3d24;
+            color: var(--text-color);
+            padding: 8px;
+            font-family: 'EB Garamond', serif;
+            font-size: 1em;
+            border-radius: 4px;
+            width: 100%;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
+        }
+
+        @media (min-width: 768px) {
+            input[type="text"], input[type="number"], select, textarea {
+                padding: 10px;
+                font-size: 1.1em;
+            }
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--accent-gold);
+            box-shadow: 0 0 8px rgba(243, 208, 117, 0.4), inset 0 2px 4px rgba(0,0,0,0.6);
+        }
+
+        .secao-flex {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        @media (min-width: 768px) {
+            .secao-flex {
+                grid-template-columns: 1fr 1fr;
+                gap: 25px;
+                margin-bottom: 25px;
+            }
+        }
+
+        .bloco {
+            border: 1px solid #4a3d24;
+            padding: 15px;
+            background: linear-gradient(135deg, rgba(15,18,25,0.8) 0%, rgba(10,12,17,0.95) 100%);
+            border-radius: 6px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5), inset 0 0 15px rgba(0,0,0,0.6);
+            margin-bottom: 15px;
+            position: relative;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        @media (min-width: 768px) {
+            .bloco {
+                padding: 22px;
+                margin-bottom: 25px;
+            }
+        }
+
+        .bloco h2 {
+            font-family: 'Cinzel', serif;
+            font-size: 1em;
+            color: var(--accent-gold);
+            border-bottom: 1px solid #4a3d24;
+            padding-bottom: 6px;
+            margin-top: 0;
+            margin-bottom: 12px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        @media (min-width: 768px) {
+            .bloco h2 {
+                font-size: 1.15em;
+                padding-bottom: 8px;
+                margin-bottom: 18px;
+                letter-spacing: 1.5px;
+            }
+        }
+
+        .bloco-header-flex {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #4a3d24;
+            padding-bottom: 6px;
+            margin-bottom: 12px;
+        }
+
+        @media (min-width: 768px) {
+            .bloco-header-flex {
+                padding-bottom: 8px;
+                margin-bottom: 18px;
+            }
+        }
+
+        .bloco-header-flex h2 {
+            margin: 0;
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .grid-atributos {
+            display: grid;
+            grid-template-columns: 1fr 80px;
+            gap: 8px;
+            align-items: center;
+        }
+
+        @media (min-width: 768px) {
+            .grid-atributos {
+                grid-template-columns: 2fr 1fr;
+                gap: 12px;
+            }
+        }
+
+        .grid-atributos label {
+            font-family: 'Cinzel', serif;
+            font-weight: 500;
+            font-size: 0.85em;
+            letter-spacing: 0.5px;
+        }
+
+        @media (min-width: 768px) {
+            .grid-atributos label {
+                font-size: 0.95em;
+            }
+        }
+
+        .grid-status {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        @media (min-width: 768px) {
+            .grid-status {
+                gap: 15px;
+            }
+        }
+
+        .status-box {
+            text-align: center;
+            border: 1px solid #4a3d24;
+            padding: 8px;
+            background: var(--input-bg);
+            border-radius: 5px;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.8);
+        }
+
+        @media (min-width: 768px) {
+            .status-box {
+                padding: 12px;
+            }
+        }
+
+        .status-box span {
+            display: block;
+            font-family: 'Cinzel', serif;
+            font-size: 0.7em;
+            color: var(--border-gold-light);
+            margin-bottom: 4px;
+            letter-spacing: 0.5px;
+        }
+
+        @media (min-width: 768px) {
+            .status-box span {
+                font-size: 0.8em;
+                letter-spacing: 1px;
+                margin-bottom: 5px;
+            }
+        }
+
+        .status-box .valor-auto {
+            font-family: 'Cinzel', serif;
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 8px rgba(243, 208, 117, 0.4);
+        }
+
+        @media (min-width: 768px) {
+            .status-box .valor-auto {
+                font-size: 1.6em;
+            }
+        }
+
+        .pentagono-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+
+        @media (min-width: 480px) {
+            .pentagono-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+        }
+
+        .elemento-box {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--input-bg);
+            padding: 6px 10px;
+            border: 1px solid #4a3d24;
+            border-radius: 4px;
+        }
+
+        @media (min-width: 768px) {
+            .elemento-box {
+                padding: 8px 12px;
+            }
+        }
+
+        .elemento-box label { 
+            font-family: 'Cinzel', serif;
+            font-weight: 500;
+            font-size: 0.85em;
+        }
+
+        @media (min-width: 768px) {
+            .elemento-box label {
+                font-size: 0.9em;
+            }
+        }
+
+        .elemento-box span.valor-elem { 
+            font-family: 'Cinzel', serif;
+            font-size: 1.1em; 
+            font-weight: bold; 
+            color: var(--accent-gold); 
+            width: 35px; 
+            text-align: center; 
+        }
+
+        .secao-tecnicas-tripla {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        @media (min-width: 768px) {
+            .secao-tecnicas-tripla {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 20px;
+                margin-bottom: 25px;
+            }
+        }
+
+        textarea {
+            width: 100%;
+            box-sizing: border-box;
+            resize: vertical;
+            height: 100px;
+            line-height: 1.4;
+        }
+
+        @media (min-width: 768px) {
+            textarea {
+                height: 125px;
+                line-height: 1.5;
+            }
+        }
+
+        .modo-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .botoes-modo {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 4px;
+            flex-wrap: wrap;
+        }
+
+        .botoes-modo button {
+            font-size: 0.7em;
+            padding: 4px 8px;
+            min-width: auto;
+            flex: 1;
+        }
+
+        .painel-modo {
+            display: none;
+        }
+
+        .painel-modo.ativo {
+            display: block;
+        }
+
+        .preview-container {
+            border: 1px dashed #4a3d24;
+            padding: 8px;
+            text-align: center;
+            background: var(--input-bg);
+            border-radius: 4px;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .preview-img {
+            max-width: 100%;
+            max-height: 130px;
+            object-fit: contain;
+            border-radius: 4px;
+            border: 1px solid var(--border-gold);
+            margin-top: 5px;
+        }
+
+        .pericias-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        @media (min-width: 768px) {
+            .pericias-container {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 12px;
+            }
+        }
+
+        .pericia-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--input-bg);
+            padding: 6px 10px;
+            border: 1px solid #4a3d24;
+            border-radius: 4px;
+        }
+
+        @media (min-width: 768px) {
+            .pericia-item {
+                padding: 8px 12px;
+            }
+        }
+
+        .pericia-info {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.95em;
+            flex-wrap: wrap;
+        }
+
+        @media (min-width: 768px) {
+            .pericia-info {
+                gap: 8px;
+                font-size: 1.05em;
+            }
+        }
+
+        .pericia-info input[type="checkbox"] {
+            accent-color: var(--accent-gold);
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .pericia-graduacao {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .pericia-graduacao label {
+            font-family: 'Cinzel', serif;
+            font-size: 0.65em;
+            color: var(--border-gold-light);
+            letter-spacing: 0.5px;
+        }
+
+        .pericia-graduacao input[type="number"] {
+            width: 38px;
+            padding: 2px;
+            text-align: center;
+            font-weight: bold;
+            color: var(--accent-gold);
+            font-family: 'Cinzel', serif;
+        }
+
+        .tag-origem {
+            font-family: 'Cinzel', serif;
+            font-size: 0.6em;
+            background: #231c11;
+            color: var(--accent-gold);
+            padding: 2px 5px;
+            border-radius: 3px;
+            border: 1px solid var(--border-gold);
+            margin-left: 3px;
+            letter-spacing: 0.5px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(5,7,10,0.85);
+            padding: 10px;
+        }
+
+        .modal-content {
+            background-color: var(--panel-bg);
+            margin: 20% auto;
+            padding: 20px;
+            border: 2px solid var(--border-gold);
+            width: 100%;
+            max-width: 600px;
+            border-radius: 6px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.9);
+            color: var(--text-color);
+        }
+
+        @media (min-width: 768px) {
+            .modal-content {
+                margin: 10% auto;
+                padding: 30px;
+            }
+        }
+
+        .modal-content h3 {
+            font-family: 'Cinzel', serif;
+            color: var(--accent-gold);
+            margin-top: 0;
+            border-bottom: 1px solid var(--border-gold);
+            padding-bottom: 8px;
+            letter-spacing: 1.5px;
+        }
+
+        .close-btn {
+            color: var(--border-gold);
+            float: right;
+            font-size: 26px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close-btn:hover {
+            color: #fff;
+        }
+
+        .modal-body ul {
+            padding-left: 15px;
+            line-height: 1.6;
+            font-size: 0.95em;
+        }
+
+        /* CONFIGURAÇÕES DE IMPRESSÃO / PDF LIMPO */
+        @media print {
+            body {
+                background: #080a0f !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                padding: 0;
+            }
+
+            .botoes-topo, .botoes-modo, input[type="file"], button[onclick*="abrirModalPentagono"] {
+                display: none !important;
+            }
+
+            .ficha-container {
+                border: none;
+                box-shadow: none;
+                padding: 5px;
+                max-width: 100%;
+            }
+
+            .bloco, header, .grid-dados-gerais, .secao-flex {
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }
+
+            .pdf-page-break {
+                break-before: page;
+                page-break-before: always;
+            }
+
+            input[type="text"], input[type="number"], select {
+                border: none !important;
+                background: transparent !important;
+                color: var(--accent-gold) !important;
+                box-shadow: none !important;
+                font-family: 'Cinzel', serif !important;
+                font-weight: bold;
+                padding: 0 !important;
+            }
+
+            textarea {
+                border: 1px solid #4a3d24 !important;
+                background: #0b0d12 !important;
+                color: #e2d9c5 !important;
+            }
+
+            .pericia-item.nao-marcada-pdf {
+                display: none !important;
+            }
+        }
+        body.modo-visualizacao .botoes-topo { display:none !important; }
+        body.modo-visualizacao input, body.modo-visualizacao select, body.modo-visualizacao textarea, body.modo-visualizacao input[type="range"], body.modo-visualizacao input[type="checkbox"] { pointer-events:none; }
+        body.modo-visualizacao { padding-top: 8px; }
+    </style>
+</head>
+<body>
+
+<div class="ficha-container" id="ficha-para-pdf">
+    <header>
+        <h1>Crônicas de Camelot</h1>
+        <div class="subtitulo">Registros Oficiais da Távola Redonda — Nível 3</div>
+        <div class="botoes-topo">
+            <button onclick="salvarLocal()">📜 Selar Ficha</button>
+            <button onclick="carregarLocal()">📖 Abrir Ficha</button>
+            <button onclick="exportarJSON()">📥 Exportar</button>
+            <button onclick="importarJSON()">📤 Importar</button>
+            <button onclick="gerarPDF()" style="background: linear-gradient(to bottom, #755214, #422a08); border-color: var(--accent-gold);">🛡️ Salvar PDF</button>
+            <button onclick="enviarFichaParaMesa()" id="btn-enviar-mesa" style="background: linear-gradient(to bottom, #315d36, #17351c); border-color: #7fd88b; color: #dfffe3;">⚔️ Enviar para a Mesa</button>
+            <input type="file" id="fileInput" style="display:none" onchange="lerArquivoJSON(event)">
+        </div>
+    </header>
+
+    <!-- Dados do Cavaleiro / Nobre -->
+    <div class="grid-dados-gerais">
+        <div class="campo-texto">
+            <label>Nome do Cavaleiro(a)</label>
+            <input type="text" id="nome" placeholder="Ex: Sir Lancelot">
+        </div>
+        <div class="campo-texto">
+            <label>Tipo Humano (Raça)</label>
+            <select id="tipo_humano" onchange="atualizarOrigemPericias()">
+                <option value="Adaptado">Adaptado (+1 Maestria, +1 Estudo)</option>
+                <option value="Prodígio">Prodígio (+2 Maestria)</option>
+                <option value="Esforço">Esforço (+1 Força, +1 Precisão)</option>
+                <option value="Gênio">Gênio (+2 Estudo)</option>
+                <option value="Robusto">Robusto (+2 Força)</option>
+                <option value="Aguçado">Aguçado (+2 Precisão)</option>
+            </select>
+        </div>
+        <div class="campo-texto">
+            <label>Antecedente</label>
+            <select id="antecedente" onchange="atualizarOrigemPericias()">
+                <option value="Soldado">Soldado (Atletismo / Percepção)</option>
+                <option value="Procurado">Procurado (Roubo / Furtividade)</option>
+                <option value="Estudioso">Estudioso (Maestria Energética / Intuição)</option>
+                <option value="Historiador">Historiador (História / Religião)</option>
+                <option value="Malandro">Malandro (Persuasão / Manipulação)</option>
+                <option value="Herói">Herói (Fortitude / Sobrevivência)</option>
+                <option value="Vingador">Vingador (Investigação / Exploração)</option>
+                <option value="Nativo">Nativo da Fronteira (Natureza / Floresta)</option>
+            </select>
+        </div>
+        <div class="campo-texto">
+            <label>Título de Glória / Epíteto</label>
+            <input type="text" id="titulo" placeholder="Ex: O Cavaleiro da Oculta Floresta">
+        </div>
+    </div>
+
+    <!-- Seção de História e Origem -->
+    <div class="bloco">
+        <h2>📜 Crônica e História do Personagem</h2>
+        <div class="secao-flex" style="margin-bottom: 0;">
+            <div class="campo-texto">
+                <label>Origem e Passado</label>
+                <textarea id="historia_origem" placeholder="De onde o cavaleiro veio? Quais provações o moldaram até o nível 3?"></textarea>
+            </div>
+            <div class="campo-texto">
+                <label>Motivação e Juramento</label>
+                <textarea id="historia_motivacao" placeholder="Qual juramento sagrado ou causa move este cavaleiro em Camelot?"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- Seção de Aparência -->
+    <div class="bloco">
+        <h2>🛡️ Retrato e Aparência Física</h2>
+        <div class="secao-flex" style="margin-bottom: 0;">
+            <div class="modo-container">
+                <label style="font-family: 'Cinzel', serif; font-size: 0.8em; color: var(--border-gold-light); font-weight: 700; letter-spacing: 1px;">Vestimentas Civis</label>
+                <div class="botoes-modo">
+                    <button type="button" onclick="mudarModoAparencia('civil', 'texto')">📝 Texto</button>
+                    <button type="button" onclick="mudarModoAparencia('civil', 'imagem')">🖼️ Imagem</button>
+                </div>
+                <div id="painel_civil_texto" class="painel-modo ativo">
+                    <textarea id="aparencia_civil" placeholder="Como o personagem se veste no dia a dia..."></textarea>
+                </div>
+                <div id="painel_civil_imagem" class="painel-modo">
+                    <div class="preview-container">
+                        <input type="file" accept="image/*" onchange="carregarImagem(event, 'preview_civil_img', 'input_civil_base64')" style="font-size: 0.75em;">
+                        <input type="hidden" id="input_civil_base64">
+                        <div id="container_preview_civil">
+                            <img id="preview_civil_img" class="preview-img" style="display:none;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modo-container">
+                <label style="font-family: 'Cinzel', serif; font-size: 0.8em; color: var(--border-gold-light); font-weight: 700; letter-spacing: 1px;">Armadura de Combate</label>
+                <div class="botoes-modo">
+                    <button type="button" onclick="mudarModoAparencia('armadura', 'texto')">📝 Texto</button>
+                    <button type="button" onclick="mudarModoAparencia('armadura', 'imagem')">🖼️ Imagem</button>
+                </div>
+                <div id="painel_armadura_texto" class="painel-modo ativo">
+                    <textarea id="aparencia_armadura" placeholder="Detalhes da armadura de combate, brasões..."></textarea>
+                </div>
+                <div id="painel_armadura_imagem" class="painel-modo">
+                    <div class="preview-container">
+                        <input type="file" accept="image/*" onchange="carregarImagem(event, 'preview_armadura_img', 'input_armadura_base64')" style="font-size: 0.75em;">
+                        <input type="hidden" id="input_armadura_base64">
+                        <div id="container_preview_armadura">
+                            <img id="preview_armadura_img" class="preview-img" style="display:none;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SALTO DE PÁGINA ESTRUTURADO PARA O PDF -->
+    <div class="pdf-page-break"></div>
+
+    <!-- Atributos Primários e Sinais Vitais -->
+    <div class="secao-flex">
+        <div class="bloco">
+            <h2>🛡️ Atributos Primários (Mín: 1 | Máx: 8)</h2>
+            <div class="grid-atributos" style="margin-bottom: 8px;">
+                <label>⚔️ Força</label>
+                <input type="number" id="attr_forca" value="5" min="1" max="8" onchange="calcularTudo()">
+            </div>
+            <div class="grid-atributos" style="margin-bottom: 8px;">
+                <label>🐎 Agilidade</label>
+                <input type="number" id="attr_agilidade" value="5" min="1" max="8" onchange="calcularTudo()">
+            </div>
+            <div class="grid-atributos" style="margin-bottom: 8px;">
+                <label>🪵 Constituição</label>
+                <input type="number" id="attr_constituicao" value="5" min="1" max="8" onchange="calcularTudo()">
+            </div>
+            <div class="grid-atributos" style="margin-bottom: 8px;">
+                <label>📜 Inteligência</label>
+                <input type="number" id="attr_inteligencia" value="4" min="1" max="8" onchange="calcularTudo()">
+            </div>
+            <div class="grid-atributos" style="margin-bottom: 8px;">
+                <label>🦉 Sabedoria</label>
+                <input type="number" id="attr_sabedoria" value="5" min="1" max="8" onchange="calcularTudo()">
+            </div>
+            <div class="grid-atributos">
+                <label>👑 Carisma</label>
+                <input type="number" id="attr_carisma" value="4" min="1" max="8" onchange="calcularTudo()">
+            </div>
+        </div>
+
+        <div class="bloco">
+            <h2>🩸 Atributos Vitais (Automáticos)</h2>
+            <div class="grid-status" style="margin-bottom: 12px;">
+                <div class="status-box">
+                    <span>❤️ Vida</span>
+                    <div class="valor-auto" id="vida_max">25</div>
+                </div>
+                <div class="status-box">
+                    <span>⚡ Vigor</span>
+                    <div class="valor-auto" id="vigor_max">20</div>
+                </div>
+                <div class="status-box">
+                    <span>✨ Mana</span>
+                    <div class="valor-auto" id="manipulacao_max">18</div>
+                </div>
+                <div class="status-box">
+                    <span>🛡️ CA Base</span>
+                    <div class="valor-auto" id="ca_base">9</div>
+                </div>
+            </div>
+            <div class="grid-atributos">
+                <label>🕊️ Sanidade</label>
+                <input type="number" id="sanidade_atual" value="100">
+            </div>
+        </div>
+    </div>
+
+    <!-- Atributos Secundários e Elementos -->
+    <div class="secao-flex">
+        <div class="bloco">
+            <h2>🎯 Atributos Secundários</h2>
+            <div class="grid-atributos" style="margin-bottom: 8px;">
+                <label>⚔️ Maestria</label>
+                <input type="number" id="sec_maestria" value="2" min="0" max="8">
+            </div>
+            <div class="grid-atributos" style="margin-bottom: 8px;">
+                <label>📚 Estudo</label>
+                <input type="number" id="sec_estudo" value="1" min="0" max="8">
+            </div>
+            <div class="grid-atributos" style="margin-bottom: 8px;">
+                <label>🗡️ Combate</label>
+                <input type="number" id="sec_combate" value="1" min="0" max="8">
+            </div>
+            <div class="grid-atributos">
+                <label>🎯 Precisão</label>
+                <input type="number" id="sec_precisao" value="0" min="0" max="8">
+            </div>
+        </div>
+
+        <div class="bloco">
+            <div class="bloco-header-flex">
+                <h2>🔮 Sinergia Elemental</h2>
+                <button type="button" onclick="abrirModalPentagono()" style="font-size: 0.7em; padding: 3px 8px; min-width: auto;">📜 Guia</button>
+            </div>
+            <div class="campo-texto" style="margin-bottom: 12px;">
+                <label>Afinidade Principal</label>
+                <select id="afinidade_principal" onchange="atualizarElementos()">
+                    <option value="Fogo">Fogo</option>
+                    <option value="Raio">Raio</option>
+                    <option value="Terra">Terra</option>
+                    <option value="Água">Água</option>
+                    <option value="Gelo">Gelo</option>
+                    <option value="Vento">Vento</option>
+                </select>
+            </div>
+            <div class="pentagono-grid">
+                <div class="elemento-box"><label>🔥 Fogo:</label><span id="val_fogo" class="valor-elem">3</span></div>
+                <div class="elemento-box"><label>⚡ Raio:</label><span id="val_raio" class="valor-elem">2</span></div>
+                <div class="elemento-box"><label>🍃 Vento:</label><span id="val_vento" class="valor-elem">2</span></div>
+                <div class="elemento-box"><label>⛰️ Terra:</label><span id="val_terra" class="valor-elem">1</span></div>
+                <div class="elemento-box"><label>💧 Água:</label><span id="val_agua" class="valor-elem">0</span></div>
+                <div class="elemento-box"><label>❄️ Gelo:</label><span id="val_gelo" class="valor-elem">0</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SEGUNDO SALTO DE PÁGINA PARA O PDF -->
+    <div class="pdf-page-break"></div>
+
+    <!-- Seção Detalhada de Perícias -->
+    <div class="bloco">
+        <h2>📖 Grimório de Perícias</h2>
+        <div style="font-size: 0.85em; color: var(--border-gold-light); margin-bottom: 12px; font-style: italic;">
+            Marque a caixa para possuir e defina o nível (1 a 3).
+        </div>
+        <div class="pericias-container" id="lista_pericias_container"></div>
+    </div>
+
+    <!-- Seção de Polaridade Energética e Caminhos (Seções Trocadas conforme instrução) -->
+    <div class="secao-flex">
+        <div class="bloco">
+            <h2>🌀 Caminhos Místicos</h2>
+            <div class="campo-texto" style="margin-bottom: 12px;">
+                <label>Polaridade Mística</label>
+                <select id="polaridade_energia">
+                    <option value="Lumini">Lumini (+)</option>
+                    <option value="Umbra">Umbra (-)</option>
+                </select>
+            </div>
+            <div class="campo-texto">
+                <label>Compatibilidade: <span id="label_porcentagem_valor" style="color: var(--accent-gold);">100</span>%</label>
+                <input type="range" id="energia_porcentagem" min="0" max="100" value="100" oninput="atualizarPorcentagemEnergia(this.value)" style="accent-color: var(--accent-gold); cursor: pointer; width: 100%;">
+            </div>
+        </div>
+
+        <div class="bloco">
+            <h2>✨ Polaridade</h2>
+            <div class="campo-texto" style="margin-bottom: 12px;">
+                <label>Caminho Principal</label>
+                <select id="caminho_principal" style="font-weight: bold; color: var(--accent-gold);">
+                    <option value="Luz">Caminho da Luz (+)</option>
+                    <option value="Sombras">Caminho das Sombras (-)</option>
+                </select>
+            </div>
+            <div class="campo-texto">
+                <label>Treinamentos Aprendidos</label>
+                <textarea id="caminhos_treinados" style="height: 60px;" placeholder="Ex: Caminho da Lança..."></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- Técnicas Triplas -->
+    <div class="secao-tecnicas-tripla">
+        <div class="bloco">
+            <h2>👤 Técnicas</h2>
+            <textarea id="tecnicas_personagem" placeholder="Magias, bênçãos..."></textarea>
+        </div>
+        <div class="bloco">
+            <h2>⚔️ Técnicas de Arma</h2>
+            <textarea id="tecnicas_arma" placeholder="Cortes, posturas..."></textarea>
+        </div>
+        <div class="bloco">
+            <h2>🛡️ Técnicas de Armadura</h2>
+            <textarea id="tecnicas_armadura" placeholder="Absorção..."></textarea>
+        </div>
+    </div>
+
+    <!-- Alforge e Energias -->
+    <div class="secao-flex">
+        <div class="bloco">
+            <h2>🎒 Alforge de Viagem</h2>
+            <textarea id="inventario" style="height: 80px;" placeholder="Relíquias, poções..."></textarea>
+        </div>
+        <div class="bloco">
+            <h2>🛡️ Armadura (CA)</h2>
+            <div class="campo-texto" style="margin-bottom: 8px;">
+                <label>Bônus de Vestimenta/Armadura</label>
+                <input type="text" id="armadura_tipo" placeholder="Ex: Cota Pesada (+4 CA)">
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Janela Modal (Guia do Pentágono Elemental) -->
+<div id="modalPentagono" class="modal">
+    <div class="modal-content">
+        <span class="close-btn" onclick="fecharModalPentagono()">&times;</span>
+        <h3>🔮 Guia do Pentágono Elemental</h3>
+        <div class="modal-body">
+            <p>Ao selecionar a sua <b>Afinidade Principal</b>, o diagrama calcula automaticamente o fluxo de sinergia:</p>
+            <ul>
+                <li><b>Valores:</b>
+                    <br>• <b>Principal:</b> <b>3</b>.
+                    <br>• <b>Conexão Forte:</b> <b>2</b>.
+                    <br>• <b>Conexão Fraca:</b> <b>1</b>.
+                    <br>• <b>Opostos:</b> <b>0</b>.
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<script>
+const mapaSinergias = {
+    "Fogo": { Fogo: 3, Raio: 2, Vento: 2, Terra: 1, Água: 0, Gelo: 0 },
+    "Raio": { Raio: 3, Fogo: 2, Terra: 2, Vento: 1, Gelo: 0, Água: 0 },
+    "Terra": { Terra: 3, Raio: 2, Gelo: 2, Água: 1, Fogo: 0, Vento: 0 },
+    "Água": { Água: 3, Gelo: 2, Terra: 2, Fogo: 1, Raio: 0, Gelo: 0 },
+    "Gelo": { Gelo: 3, Água: 2, Vento: 2, Terra: 1, Fogo: 0, Raio: 0 },
+    "Vento": { Vento: 3, Fogo: 2, Gelo: 2, Raio: 1, Terra: 0, Água: 0 }
+};
+
+const periciasCatalogo = [
+    { id: 'atletismo', nome: 'Atletismo', antecedentes: ['Soldado'] },
+    { id: 'acrobacia', nome: 'Acrobacia', antecedentes: [] },
+    { id: 'maestria_energetica', nome: 'Maestria Energética', antecedentes: ['Estudioso'] },
+    { id: 'fortitude', nome: 'Fortitude', antecedentes: ['Herói'] },
+    { id: 'historia', nome: 'História', antecedentes: ['Historiador'] },
+    { id: 'religiao', nome: 'Religião', antecedentes: ['Historiador'] },
+    { id: 'intimidacao', nome: 'Intimidação', antecedentes: [] },
+    { id: 'blefe', nome: 'Blefe', antecedentes: [] },
+    { id: 'persuasao', nome: 'Persuasão', antecedentes: ['Malandro'] },
+    { id: 'manipulacao', nome: 'Manipulação', antecedentes: ['Malandro'] },
+    { id: 'intuicao', nome: 'Intuição', antecedentes: ['Estudioso'] },
+    { id: 'percepcao', nome: 'Percepção', antecedentes: ['Soldado'] },
+    { id: 'roubo', nome: 'Roubo', antecedentes: ['Procurado'] },
+    { id: 'furtividade', nome: 'Furtividade', antecedentes: ['Procurado'] },
+    { id: 'medicina', nome: 'Medicina', antecedentes: [] },
+    { id: 'natureza', nome: 'Natureza', antecedentes: ['Nativo'] },
+    { id: 'floresta', nome: 'Floresta / Sobrevivência', antecedentes: ['Nativo'] },
+    { id: 'sobrevivencia', nome: 'Sobrevivência', antecedentes: ['Herói'] },
+    { id: 'investigacao', nome: 'Investigação', antecedentes: ['Vingador'] },
+    { id: 'exploracao', nome: 'Exploração', antecedentes: ['Vingador'] }
+];
+
+function construirListaPericias() {
+    const container = document.getElementById('lista_pericias_container');
+    container.innerHTML = '';
+    periciasCatalogo.forEach(p => {
+        container.innerHTML += `
+            <div class="pericia-item" id="per_item_div_${p.id}">
+                <div class="pericia-info">
+                    <input type="checkbox" id="per_chk_${p.id}" onchange="verificarPericiaImpressao('${p.id}')">
+                    <label for="per_chk_${p.id}">${p.nome}</label>
+                    <span id="per_tag_${p.id}" style="display:none;" class="tag-origem">Ant.</span>
+                </div>
+                <div class="pericia-graduacao">
+                    <label>Nível</label>
+                    <input type="number" id="per_val_${p.id}" min="0" max="3" value="0" onchange="verificarPericiaImpressao('${p.id}')">
+                </div>
+            </div>
+        `;
+    });
+    atualizarOrigemPericias();
+}
+
+function verificarPericiaImpressao(id) {
+    const chk = document.getElementById(`per_chk_${id}`);
+    const val = document.getElementById(`per_val_${id}`);
+    const itemDiv = document.getElementById(`per_item_div_${id}`);
+    
+    if (!chk.checked && parseInt(val.value) === 0) {
+        itemDiv.classList.add('nao-marcada-pdf');
+    } else {
+        itemDiv.classList.remove('nao-marcada-pdf');
+    }
+}
+
+function atualizarOrigemPericias() {
+    const antecedenteSelecionado = document.getElementById('antecedente').value;
+    periciasCatalogo.forEach(p => {
+        const tag = document.getElementById(`per_tag_${p.id}`);
+        const chk = document.getElementById(`per_chk_${p.id}`);
+        const val = document.getElementById(`per_val_${p.id}`);
+        if (p.antecedentes.includes(antecedenteSelecionado)) {
+            tag.style.display = 'inline-block';
+            chk.checked = true; 
+            if (parseInt(val.value) === 0) val.value = 1; 
+        } else {
+            tag.style.display = 'none';
+        }
+        verificarPericiaImpressao(p.id);
+    });
+}
+
+function mudarModoAparencia(alvo, modo) {
+    const painelTexto = document.getElementById(`painel_${alvo}_texto`);
+    const painelImagem = document.getElementById(`painel_${alvo}_imagem`);
+    if (modo === 'texto') {
+        painelTexto.classList.add('ativo');
+        painelImagem.classList.remove('ativo');
+    } else {
+        painelTexto.classList.remove('ativo');
+        painelImagem.classList.add('ativo');
+    }
+}
+
+function carregarImagem(event, idImgPreview, idInputHidden) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const base64String = e.target.result;
+        document.getElementById(idInputHidden).value = base64String;
+        const imgElement = document.getElementById(idImgPreview);
+        imgElement.src = base64String;
+        imgElement.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+}
+
+function atualizarPorcentagemEnergia(valor) {
+    document.getElementById('label_porcentagem_valor').innerText = valor;
+}
+
+function calcularTudo() {
+    const forca = parseInt(document.getElementById('attr_forca').value) || 0;
+    const agilidade = parseInt(document.getElementById('attr_agilidade').value) || 0;
+    const constituicao = parseInt(document.getElementById('attr_constituicao').value) || 0;
+    const inteligencia = parseInt(document.getElementById('attr_inteligencia').value) || 0;
+    const sabedoria = parseInt(document.getElementById('attr_sabedoria').value) || 0;
+    const carisma = parseInt(document.getElementById('attr_carisma').value) || 0;
+
+    document.getElementById('vida_max').innerText = 20 + constituicao;
+    document.getElementById('vigor_max').innerText = 10 + forca + constituicao;
+    document.getElementById('manipulacao_max').innerText = 9 + inteligencia + sabedoria;
+    document.getElementById('ca_base').innerText = carisma + agilidade;
+}
+
+function atualizarElementos() {
+    const escolha = document.getElementById('afinidade_principal').value;
+    const sinergia = mapaSinergias[escolha];
+    if (!sinergia) return;
+
+    document.getElementById('val_fogo').innerText = sinergia.Fogo;
+    document.getElementById('val_raio').innerText = sinergia.Raio;
+    document.getElementById('val_vento').innerText = sinergia.Vento;
+    document.getElementById('val_terra').innerText = sinergia.Terra;
+    document.getElementById('val_agua').innerText = sinergia.Água;
+    document.getElementById('val_gelo').innerText = sinergia.Gelo;
+}
+
+function abrirModalPentagono() {
+    document.getElementById('modalPentagono').style.display = 'block';
+}
+
+function fecharModalPentagono() {
+    document.getElementById('modalPentagono').style.display = 'none';
+}
+
+window.onclick = function(event) {
+    const modal = document.getElementById('modalPentagono');
+    if (event.target == modal) modal.style.display = 'none';
+}
+
+function gerarPDF() {
+    window.print();
+}
+
+const listaCamposFixos = [
+    'nome', 'tipo_humano', 'antecedente', 'titulo',
+    'historia_origem', 'historia_motivacao',
+    'aparencia_civil', 'input_civil_base64',
+    'aparencia_armadura', 'input_armadura_base64',
+    'attr_forca', 'attr_agilidade', 'attr_constituicao', 'attr_inteligencia', 'attr_sabedoria', 'attr_carisma',
+    'sanidade_atual', 'sec_maestria', 'sec_estudo', 'sec_combate', 'sec_precisao',
+    'afinidade_principal', 'polaridade_energia', 'energia_porcentagem',
+    'caminho_principal', 'caminhos_treinados',
+    'tecnicas_personagem', 'tecnicas_arma', 'tecnicas_armadura', 'inventario', 'armadura_tipo'
+];
+
+function obterDadosFicha() {
+    let dados = {};
+    listaCamposFixos.forEach(id => { 
+        const el = document.getElementById(id);
+        dados[id] = el ? el.value : ''; 
+    });
+    let dadosPericias = {};
+    periciasCatalogo.forEach(p => {
+        dadosPericias[p.id] = {
+            checked: document.getElementById(`per_chk_${p.id}`).checked,
+            valor: document.getElementById(`per_val_${p.id}`).value
+        };
+    });
+    dados['pericias_dados'] = dadosPericias;
+    return dados;
+}
+
+function carregarDadosFicha(dados) {
+    if (!dados) return;
+    Object.keys(dados).forEach(id => {
+        if (id === 'pericias_dados') return;
+        const el = document.getElementById(id);
+        if (el) {
+            el.value = dados[id];
+            if (id === 'energia_porcentagem') atualizarPorcentagemEnergia(dados[id]);
+            if (id === 'input_civil_base64' && dados[id]) {
+                const img = document.getElementById('preview_civil_img');
+                img.src = dados[id];
+                img.style.display = 'block';
+                mudarModoAparencia('civil', 'imagem');
+            }
+            if (id === 'input_armadura_base64' && dados[id]) {
+                const img = document.getElementById('preview_armadura_img');
+                img.src = dados[id];
+                img.style.display = 'block';
+                mudarModoAparencia('armadura', 'imagem');
+            }
+        }
+    });
+    if (dados['pericias_dados']) {
+        Object.keys(dados['pericias_dados']).forEach(pid => {
+            const pInfo = dados['pericias_dados'][pid];
+            const chk = document.getElementById(`per_chk_${pid}`);
+            const val = document.getElementById(`per_val_${pid}`);
+            if (chk) chk.checked = pInfo.checked;
+            if (val) val.value = pInfo.valor;
+            verificarPericiaImpressao(pid);
+        });
+    }
+    calcularTudo();
+    atualizarElementos();
+    atualizarOrigemPericias();
+}
+
+function salvarLocal() {
+    localStorage.setItem('ficha_camelot_2d10_nvl3_arturiano', JSON.stringify(obterDadosFicha()));
+    alert('📜 Os registros e o pergaminho deste Cavaleiro foram selados com honra!');
+}
+
+function carregarLocal() {
+    const dados = localStorage.getItem('ficha_camelot_2d10_nvl3_arturiano');
+    if (dados) {
+        carregarDadosFicha(JSON.parse(dados));
+        alert('📖 O pergaminho sagrado foi reaberto perante a Távola Redonda!');
+    } else {
+        alert('Nenhum registro encontrado neste navegador.');
+    }
+}
+
+function exportarJSON() {
+    const nomeCavaleiro = document.getElementById('nome').value || 'cavaleiro';
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(obterDadosFicha(), null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `cronica_nvl3_${nomeCavaleiro}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+}
+
+function importarJSON() {
+    document.getElementById('fileInput').click();
+}
+
+function lerArquivoJSON(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const dados = JSON.parse(e.target.result);
+            carregarDadosFicha(dados);
+            alert('⚔️ A crônica do Cavaleiro foi importada com sucesso!');
+        } catch (err) {
+            alert('Erro ao decifrar o pergaminho (JSON inválido).');
+        }
+    };
+    reader.readAsText(file);
+}
+
+window.onload = function() {
+    construirListaPericias();
+    calcularTudo();
+    atualizarElementos();
+    atualizarPorcentagemEnergia(document.getElementById('energia_porcentagem').value);
+    inicializarIntegracaoMesa();
+};
+
+function enviarFichaParaMesa() {
+    try {
+        const dados = obterDadosFicha();
+        window.parent.postMessage({ type: 'cronicas-camelot-ficha-pronta', dados: dados }, window.location.origin);
+    } catch (err) {
+        alert('Não foi possível enviar a ficha para a mesa.');
+        console.error(err);
+    }
+}
+
+function inicializarIntegracaoMesa() {
+    const params = new URLSearchParams(window.location.search);
+    const visualizacao = params.get('modo') === 'visualizacao';
+    if (visualizacao) document.body.classList.add('modo-visualizacao');
+
+    window.addEventListener('message', function(event) {
+        if (event.origin !== window.location.origin) return;
+        if (!event.data || event.data.type !== 'cronicas-camelot-carregar-ficha') return;
+        if (event.data.dados) {
+            carregarDadosFicha(event.data.dados);
+            if (visualizacao) {
+                setTimeout(() => {
+                    document.querySelectorAll('input, select, textarea, button').forEach(el => { el.disabled = true; });
+                }, 50);
+            }
+        }
+    });
+}
+</script>
+
+</body>
+</html>

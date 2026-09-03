@@ -684,14 +684,16 @@ function configurarPanMapa() {
     }
   };
 
-  canvas.onmousedown = iniciarPan;
-  canvas.ontouchstart = iniciarPan;
+  // Pointer Events funcionam para mouse, toque e caneta e evitam
+  // listeners globais de touch que podem capturar/interferir com
+  // cliques da interface no celular.
+  canvas.onpointerdown = iniciarPan;
+  canvas.onpointermove = moverPan;
+  canvas.onpointerup = pararPan;
+  canvas.onpointercancel = pararPan;
 
-  window.addEventListener('mousemove', moverPan, { passive: false });
-  window.addEventListener('mouseup', pararPan);
-  window.addEventListener('touchmove', moverPan, { passive: false });
-  window.addEventListener('touchend', pararPan);
 }
+
 
 function alternarMovimentoMapa() {
   if (!ehMestreGlobal) return;

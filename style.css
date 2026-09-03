@@ -523,3 +523,48 @@ input[type="file"]::file-selector-button {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* ==========================================================
+   TOQUE / MOBILE — garante que a interface continue clicável
+   ========================================================== */
+html, body {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button, input, select, textarea, a, label, summary {
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+button {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.abas-navegacao {
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* O gesto de toque no mapa é tratado pelo próprio VTT.
+   Fora dele, o navegador fica livre para rolar a página normalmente. */
+.vtt-wrapper {
+  touch-action: none;
+}
+
+.vtt-token {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+@media (max-width: 768px) {
+  button, .btn-acao, .btn-secundario, .btn-perigo, .btn-ficha-principal {
+    touch-action: manipulation !important;
+    pointer-events: auto !important;
+  }
+
+  .abas-navegacao button {
+    flex: 0 0 auto;
+  }
+}

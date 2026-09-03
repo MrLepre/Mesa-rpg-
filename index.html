@@ -121,6 +121,14 @@
         <div class="form-sistema">
           <label><span>Nome do sistema</span><input id="novo-sistema-nome" type="text" maxlength="100" placeholder="Ex.: D&D 5e"></label>
           <label><span>Descrição</span><textarea id="novo-sistema-descricao" maxlength="500" rows="2" placeholder="Como funciona este sistema?"></textarea></label>
+          <div class="builder-bloco builder-tema-bloco">
+            <div class="builder-titulo"><strong>🎨 Identidade visual</strong><small>Defina as cores usadas pela ficha deste sistema.</small></div>
+            <div class="builder-tema-grid">
+              <label><span>Cor principal</span><input id="sistema-cor-primaria" type="color" value="#c5a059"></label>
+              <label><span>Fundo</span><input id="sistema-cor-fundo" type="color" value="#080a0f"></label>
+              <label><span>Painel</span><input id="sistema-cor-painel" type="color" value="#151821"></label>
+            </div>
+          </div>
 
           <div class="builder-etapa-nav">
             <button type="button" class="builder-etapa ativo" onclick="mudarEtapaBuilder(1)">1. Componentes</button>

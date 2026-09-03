@@ -5,53 +5,37 @@
 <title>Ficha RPG</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=EB+Garamond:wght@400;600&display=swap" rel="stylesheet"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-:root{--bg:#080a0f;--panel:#151821;--gold:#c5a059;--gold2:#f3d075;--text:#e2d9c5;--input:#080a0f}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 50% 0%,#1f2738 0%,#080a0f 70%);color:var(--text);font-family:'EB Garamond',serif;padding:12px;overflow-x:hidden}.ficha{max-width:1050px;margin:auto;border:2px solid var(--gold);background:var(--panel);padding:20px;border-radius:8px;box-shadow:0 0 30px #000}.top{text-align:center;border-bottom:1px solid var(--gold);margin-bottom:18px;padding-bottom:12px}.top h1{font-family:Cinzel;color:var(--gold2);margin:0;font-size:2em}.top p{margin:5px 0;color:#e6ca88}.bloco{border:1px solid #403522;padding:14px;margin-bottom:14px;border-radius:6px;background:linear-gradient(135deg,rgba(15,18,25,.9),rgba(10,12,17,.98));box-shadow:0 4px 15px rgba(0,0,0,.35)}.bloco h2{font-family:Cinzel;color:var(--gold2);font-size:1.05rem;border-bottom:1px solid #403522;padding-bottom:7px;margin:0 0 12px}.grid{display:grid;grid-template-columns:repeat(var(--cols,2),minmax(0,1fr));gap:10px}.campo{display:grid;gap:4px;margin-bottom:2px}.campo label{color:#e6ca88;font-weight:600}.campo input,.campo textarea{width:100%;background:var(--input);color:#eee;border:1px solid #403522;border-radius:4px;padding:8px;font:inherit}.campo textarea{resize:vertical;min-height:85px}.campo input:focus,.campo textarea:focus{outline:none;border-color:var(--gold2);box-shadow:0 0 7px rgba(243,208,117,.25)}.checkbox{display:flex;align-items:center;gap:7px;background:var(--input);padding:9px;border:1px solid #403522;border-radius:4px}.checkbox input{width:auto}.acoes{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}.acoes button{padding:10px 14px;background:#211c12;color:var(--gold2);border:1px solid var(--gold);border-radius:5px;font-weight:700;cursor:pointer}.vazio{opacity:.7;text-align:center;padding:20px}.span-2{grid-column:span 2}.span-3{grid-column:span 3}.span-4{grid-column:span 4}@media(max-width:700px){.ficha{padding:12px}.top h1{font-size:1.5em}.grid{grid-template-columns:1fr!important}.span-2,.span-3,.span-4{grid-column:auto}}
+:root{--bg:#080a0f;--panel:#151821;--gold:#c5a059;--gold2:#f3d075;--text:#e2d9c5;--input:#080a0f;--muted:#9e947f}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 50% 0%,#1f2738 0%,var(--bg) 70%);color:var(--text);font-family:'EB Garamond',serif;padding:12px;overflow-x:hidden}.ficha{max-width:1050px;margin:auto;border:2px solid var(--gold);background:var(--panel);padding:20px;border-radius:8px;box-shadow:0 0 30px #000}.top{text-align:center;border-bottom:1px solid var(--gold);margin-bottom:18px;padding-bottom:12px}.top h1{font-family:Cinzel;color:var(--gold2);margin:0;font-size:2em}.top p{margin:5px 0;color:#e6ca88}.bloco{border:1px solid #403522;padding:14px;margin-bottom:14px;border-radius:6px;background:linear-gradient(135deg,rgba(15,18,25,.9),rgba(10,12,17,.98));box-shadow:0 4px 15px rgba(0,0,0,.35)}.bloco h2{font-family:Cinzel;color:var(--gold2);font-size:1.05rem;border-bottom:1px solid #403522;padding-bottom:7px;margin:0 0 12px}.grid{display:grid;grid-template-columns:repeat(var(--cols,2),minmax(0,1fr));gap:10px}.campo{display:grid;gap:4px;margin-bottom:2px;min-width:0}.campo label{color:#e6ca88;font-weight:600}.campo small{color:var(--muted);font-size:.8rem}.campo input,.campo textarea,.campo select{width:100%;background:var(--input);color:#eee;border:1px solid #403522;border-radius:4px;padding:8px;font:inherit}.campo textarea{resize:vertical;min-height:85px}.campo input:focus,.campo textarea:focus,.campo select:focus{outline:none;border-color:var(--gold2);box-shadow:0 0 7px rgba(243,208,117,.25)}.checkbox{display:flex;align-items:center;gap:7px;background:var(--input);padding:9px;border:1px solid #403522;border-radius:4px}.checkbox input{width:auto}.calculado input{border-color:#6f5b2d;color:var(--gold2);font-weight:700}.recurso{display:grid;grid-template-columns:1fr auto;gap:7px;align-items:end}.recurso-max{max-width:90px}.campo-roll{display:flex;gap:6px}.campo-roll button{background:#211c12;color:var(--gold2);border:1px solid var(--gold);border-radius:4px;padding:6px 9px;cursor:pointer}.acoes{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}.acoes button{padding:10px 14px;background:#211c12;color:var(--gold2);border:1px solid var(--gold);border-radius:5px;font-weight:700;cursor:pointer}.vazio{opacity:.7;text-align:center;padding:20px}.span-2{grid-column:span 2}.span-3{grid-column:span 3}.span-4{grid-column:span 4}@media(max-width:700px){.ficha{padding:12px}.top h1{font-size:1.5em}.grid{grid-template-columns:1fr!important}.span-2,.span-3,.span-4{grid-column:auto}}
 </style>
 </head>
 <body>
-<div class="ficha">
-  <div class="top"><h1 id="titulo">Sistema RPG</h1><p id="subtitulo">Ficha de personagem</p></div>
-  <div id="conteudo"><p class="vazio">Carregando sistema...</p></div>
-  <div class="acoes"><button onclick="enviar()">⚔️ Enviar para a Mesa</button><button onclick="window.print()">📜 Imprimir / PDF</button></div>
-</div>
+<div class="ficha" id="ficha"><div class="top"><h1 id="titulo">Sistema RPG</h1><p id="subtitulo">Ficha de personagem</p></div><div id="conteudo"><p class="vazio">Carregando sistema...</p></div><div class="acoes"><button onclick="enviar()">⚔️ Enviar para a Mesa</button><button onclick="salvarLocal()">💾 Salvar rascunho</button><button onclick="window.print()">📜 Imprimir / PDF</button></div></div>
 <script>
-let sistema=null;
+let sistema=null, config={}, modo='criacao', dadosCarregados=null;
 function esc(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;')}
+function slug(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9_]/g,'_').toUpperCase()}
 function catalogo(c){return [...(c.atributos||[]).map((x,i)=>({...x,id:x.id||`atributo_${i}`,grupo:'Atributo',tipo:'numero'})),...(c.recursos||[]).map((x,i)=>({...x,id:x.id||`recurso_${i}`,grupo:'Recurso',tipo:x.tipo||'numero'})),...(c.pericias||[]).map((x,i)=>({...x,id:x.id||`pericia_${i}`,grupo:'Perícia',tipo:'numero'})),...(c.campos||[]).map((x,i)=>({...x,id:x.id||`campo_${i}`,grupo:'Campo',tipo:x.tipo||'texto'}))]}
-function inputCampo(c){
- const required=c.obrigatorio?' required':''; const placeholder=esc(c.placeholder||'');
- if(c.tipo==='area') return `<textarea id="${esc(c.id)}" rows="4" placeholder="${placeholder}"${required}></textarea>`;
- if(c.tipo==='checkbox') return `<label class="checkbox"><input id="${esc(c.id)}" type="checkbox"> marcado</label>`;
- return `<input id="${esc(c.id)}" type="${c.tipo==='numero'?'number':'text'}" value="${esc(c.valor_padrao||'')}" placeholder="${placeholder}"${required}>`;
+function valorCampo(id){const e=document.getElementById(id);if(!e)return '';return e.type==='checkbox'?(e.checked?1:0):e.value}
+function montarMapaValores(){const mapa={};catalogo(config).forEach(c=>{const v=Number(valorCampo(c.id));const n=Number.isFinite(v)?v:0;mapa[c.id]=n;if(c.sigla)mapa[slug(c.sigla)]=n;mapa[slug(c.nome)]=n});return mapa}
+function avaliarFormula(formula){if(!formula)return '';let f=String(formula).replace(/[{}]/g,'');const vals=montarMapaValores();f=f.replace(/\b[A-Za-z_][A-Za-z0-9_]*\b/g,m=>Object.prototype.hasOwnProperty.call(vals,m.toUpperCase())?String(vals[m.toUpperCase()]):'0');if(!/^[0-9+\-*/().\s]+$/.test(f))return '';try{const result=Function('"use strict";return ('+f+')')();return Number.isFinite(result)?Math.round(result*100)/100:''}catch{return ''}}
+function atualizarCalculados(){catalogo(config).filter(c=>c.calculado&&c.formula).forEach(c=>{const e=document.getElementById(c.id);if(e){e.value=avaliarFormula(c.formula);e.readOnly=true}})}
+function inputCampo(c,dados){const value=dados?.[c.id] ?? c.valor_padrao ?? '';const required=c.obrigatorio?' required':'';const placeholder=esc(c.placeholder||'');const disabled=c.calculado?' readonly':'';
+ if(c.tipo==='area') return `<textarea id="${esc(c.id)}" rows="4" placeholder="${placeholder}"${required}>${esc(value)}</textarea>`;
+ if(c.tipo==='checkbox') return `<label class="checkbox"><input id="${esc(c.id)}" type="checkbox" ${value?'checked':''}${c.calculado?' disabled':''}> marcado</label>`;
+ if(c.tipo==='select') return `<select id="${esc(c.id)}"${required}${c.calculado?' disabled':''}>${(c.opcoes||[]).map(o=>`<option value="${esc(o)}" ${String(o)===String(value)?'selected':''}>${esc(o)}</option>`).join('')}</select>`;
+ const max=c.valor_maximo!==''&&c.valor_maximo!=null?` max="${esc(c.valor_maximo)}"`:'';return `<input id="${esc(c.id)}" type="${c.tipo==='numero'?'number':'text'}" value="${esc(value)}" placeholder="${placeholder}"${required}${max}${disabled}>`;
 }
-function renderizar(c){
- const mapa=new Map(catalogo(c).map(x=>[x.id,x]));
- let html=`<section class="bloco"><h2>📜 Identidade</h2><div class="grid" style="--cols:2"><div class="campo"><label>Nome do Personagem</label><input id="nome" placeholder="Ex.: Sir Lancelot"></div><div class="campo"><label>Nível</label><input id="nivel" type="number" min="1" placeholder="1"></div></div></section>`;
- const secoes=Array.isArray(c.secoes)&&c.secoes.length?c.secoes:[
-  {titulo:'Atributos',icone:'🛡️',colunas:3,campos:(c.atributos||[]).map((x,i)=>x.id||`atributo_${i}`)},
-  {titulo:'Recursos',icone:'❤️',colunas:3,campos:(c.recursos||[]).map((x,i)=>x.id||`recurso_${i}`)},
-  {titulo:'Perícias',icone:'🎯',colunas:2,campos:(c.pericias||[]).map((x,i)=>x.id||`pericia_${i}`)},
-  {titulo:'Registro',icone:'📚',colunas:1,campos:(c.campos||[]).map((x,i)=>x.id||`campo_${i}`)}
- ];
- secoes.forEach(s=>{
-   const campos=(s.campos||[]).map(id=>mapa.get(id)).filter(Boolean);
-   if(!campos.length)return;
-   html+=`<section class="bloco"><h2>${esc(s.icone||'◆')} ${esc(s.titulo||'Seção')}</h2><div class="grid" style="--cols:${Math.min(4,Math.max(1,Number(s.colunas||1)))}">${campos.map(x=>`<div class="campo span-${Math.min(4,Number(x.largura||1))}"><label>${esc(x.nome)}${x.obrigatorio?' *':''}</label>${inputCampo(x)}</div>`).join('')}</div></section>`;
- });
- document.getElementById('conteudo').innerHTML=html;
-}
-async function iniciar(){
- const p=new URLSearchParams(location.search),id=p.get('sistema');
- if(!id){document.getElementById('conteudo').innerHTML='<p class="vazio">Nenhum sistema foi informado.</p>';return}
- const url='https://rolrbrtpqbchyxmjmvzr.supabase.co',key='sb_publishable_mJmFjELKk4O1HCTzoKxDdw_EWaiv4j1';
- if(!window.supabase){document.getElementById('conteudo').innerHTML='<p class="vazio">Biblioteca do Supabase não carregada.</p>';return}
- const sb=window.supabase.createClient(url,key); const r=await sb.from('sistemas').select('*').eq('id',id).single();
- if(r.error){document.getElementById('conteudo').innerHTML='<p class="vazio">Sistema não encontrado.</p>';return}
- sistema=r.data;const c=sistema.configuracao||{};document.getElementById('titulo').textContent=sistema.nome;renderizar(c);
-}
-function obter(){const out={_sistema_id:sistema?.id,_sistema_nome:sistema?.nome};document.querySelectorAll('#conteudo input,#conteudo textarea').forEach(e=>out[e.id]=e.type==='checkbox'?e.checked:e.value);return out}
-function enviar(){window.parent.postMessage({type:'cronicas-camelot-ficha-pronta',dados:obter(),modo:'criacao',sistema_id:sistema?.id},location.origin)}
+function renderizar(c){config=c;const mapa=new Map(catalogo(c).map(x=>[x.id,x]));let html=`<section class="bloco"><h2>📜 Identidade</h2><div class="grid" style="--cols:2"><div class="campo"><label>Nome do Personagem</label><input id="nome" placeholder="Ex.: Sir Lancelot" value="${esc(dadosCarregados?.nome||'')}"></div><div class="campo"><label>Nível</label><input id="nivel" type="number" min="1" value="${esc(dadosCarregados?.nivel||1)}"></div></div></section>`;
+ const secoes=Array.isArray(c.secoes)&&c.secoes.length?c.secoes:[{titulo:'Atributos',icone:'🛡️',colunas:3,campos:(c.atributos||[]).map((x,i)=>x.id||`atributo_${i}`)},{titulo:'Recursos',icone:'❤️',colunas:3,campos:(c.recursos||[]).map((x,i)=>x.id||`recurso_${i}`)},{titulo:'Perícias',icone:'🎯',colunas:2,campos:(c.pericias||[]).map((x,i)=>x.id||`pericia_${i}`)},{titulo:'Registro',icone:'📚',colunas:1,campos:(c.campos||[]).map((x,i)=>x.id||`campo_${i}`)}];
+ secoes.forEach(s=>{const campos=(s.campos||[]).map(id=>mapa.get(id)).filter(Boolean);if(!campos.length)return;html+=`<section class="bloco"><h2>${esc(s.icone||'◆')} ${esc(s.titulo||'Seção')}</h2><div class="grid" style="--cols:${Math.min(4,Math.max(1,Number(s.colunas||1)))}">${campos.map(x=>{const roll=x.rolagem?`<button type="button" onclick="rolarCampo('${esc(x.id)}')">🎲</button>`:'';const cls=x.calculado?'calculado':'';return `<div class="campo ${cls} span-${Math.min(4,Number(x.largura||1))}"><label>${esc(x.nome)}${x.obrigatorio?' *':''}</label>${x.ajuda?`<small>${esc(x.ajuda)}</small>`:''}<div class="campo-roll">${inputCampo(x,dadosCarregados)}${roll}</div></div>`}).join('')}</div></section>`});document.getElementById('conteudo').innerHTML=html;document.getElementById('titulo').textContent=sistema.nome;document.getElementById('subtitulo').textContent=(sistema.descricao||'Ficha de personagem')+(modo==='edicao'?' — edição':'');aplicarTema(c.tema||{});atualizarCalculados();document.querySelectorAll('#conteudo input,#conteudo textarea,#conteudo select').forEach(e=>e.addEventListener('input',atualizarCalculados));}
+function aplicarTema(t){document.documentElement.style.setProperty('--gold',t.corPrimaria||'#c5a059');document.documentElement.style.setProperty('--gold2',t.corPrimaria||'#f3d075');document.documentElement.style.setProperty('--bg',t.corFundo||'#080a0f');document.documentElement.style.setProperty('--panel',t.corPainel||'#151821')}
+function obter(){const out={_sistema_id:sistema?.id,_sistema_nome:sistema?.nome,_modo:modo};document.querySelectorAll('#conteudo input,#conteudo textarea,#conteudo select').forEach(e=>{if(e.disabled&&!e.readOnly)return;out[e.id]=e.type==='checkbox'?e.checked:e.value});return out}
+function resolverRolagem(expr){const vals=montarMapaValores();return String(expr||'').replace(/\b[A-Za-z_][A-Za-z0-9_]*\b/g,m=>Object.prototype.hasOwnProperty.call(vals,m.toUpperCase())?String(vals[m.toUpperCase()]):m)}
+function rolarCampo(id){const c=catalogo(config).find(x=>x.id===id);if(!c?.rolagem)return;const expr=resolverRolagem(c.rolagem);window.parent.postMessage({type:'cronicas-camelot-rolar-expressao',expressao:expr,descricao:`${sistema.nome}: ${c.nome}`},location.origin)}
+function enviar(){window.parent.postMessage({type:'cronicas-camelot-ficha-pronta',dados:obter(),modo, sistema_id:sistema?.id},location.origin)}
+function salvarLocal(){localStorage.setItem('ficha_rpg_rascunho_'+(sistema?.id||'generico'),JSON.stringify(obter()));alert('💾 Rascunho salvo neste dispositivo.');}
+async function iniciar(){const p=new URLSearchParams(location.search);const id=p.get('sistema');modo=p.get('modo')||'criacao';if(!id){document.getElementById('conteudo').innerHTML='<p class="vazio">Nenhum sistema foi informado.</p>';return}const sb=window.supabase.createClient('https://rolrbrtpqbchyxmjmvzr.supabase.co','sb_publishable_mJmFjELKk4O1HCTzoKxDdw_EWaiv4j1');const r=await sb.from('sistemas').select('*').eq('id',id).single();if(r.error){document.getElementById('conteudo').innerHTML='<p class="vazio">Sistema não encontrado.</p>';return}sistema=r.data;config=sistema.configuracao||{};renderizar(config)}
+window.addEventListener('message',e=>{if(e.origin!==location.origin||e.data?.type!=='cronicas-camelot-carregar-ficha')return;dadosCarregados=e.data.dados||{};modo=e.data.modo||'edicao';if(sistema)renderizar(config)});
 iniciar();
-</script>
-</body></html>
+</script></body></html>

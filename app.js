@@ -658,7 +658,8 @@ const TIPOS_CAMPO = [
   {value:'texto',label:'Texto'},
   {value:'numero',label:'Número'},
   {value:'area',label:'Texto longo'},
-  {value:'checkbox',label:'Caixa de seleção'}
+  {value:'checkbox',label:'Caixa de seleção'},
+  {value:'select',label:'Lista de opções'}
 ];
 const CAMPOS_SISTEMA_PADRAO = {
   atributos: [{nome:'Força', sigla:'FOR'}, {nome:'Destreza', sigla:'DES'}, {nome:'Constituição', sigla:'CON'}],
@@ -679,7 +680,13 @@ function normalizarCampoBuilder(campo, fallbackTipo='texto') {
     largura: Number(campo?.largura || 1),
     obrigatorio: !!campo?.obrigatorio,
     placeholder: campo?.placeholder || '',
-    valor_padrao: campo?.valor_padrao ?? ''
+    valor_padrao: campo?.valor_padrao ?? '',
+    opcoes: Array.isArray(campo?.opcoes) ? [...campo.opcoes] : [],
+    formula: campo?.formula || '',
+    calculado: !!campo?.calculado,
+    rolagem: campo?.rolagem || '',
+    valor_maximo: campo?.valor_maximo ?? '',
+    ajuda: campo?.ajuda || ''
   };
 }
 
@@ -753,6 +760,9 @@ function abrirNovoSistema() {
   document.getElementById('titulo-editor-sistema').textContent = '👑 Criar novo sistema';
   document.getElementById('novo-sistema-nome').value = '';
   document.getElementById('novo-sistema-descricao').value = '';
+  if(document.getElementById('sistema-cor-primaria')) document.getElementById('sistema-cor-primaria').value='#c5a059';
+  if(document.getElementById('sistema-cor-fundo')) document.getElementById('sistema-cor-fundo').value='#080a0f';
+  if(document.getElementById('sistema-cor-painel')) document.getElementById('sistema-cor-painel').value='#151821';
   iniciarBuilderSistema();
   mudarEtapaBuilder(1);
   document.getElementById('painel-novo-sistema').style.display = 'block';
@@ -771,7 +781,7 @@ function renderizarBuilderSistema(){
 }
 function alternarDadoSistema(d){ builderSistema.dados=builderSistema.dados.includes(d)?builderSistema.dados.filter(x=>x!==d):[...builderSistema.dados,d]; renderizarBuilderSistema(); }
 function adicionarCampoSistema(tipo){
-  const defaults={atributos:{nome:'Novo Atributo',sigla:'ATR',tipo:'numero'},recursos:{nome:'Novo Recurso',sigla:'REC',tipo:'numero'},pericias:{nome:'Nova Perícia',atributo:'',tipo:'numero'},campos:{nome:'Novo Campo',tipo:'texto'}};
+  const defaults={atributos:{nome:'Novo Atributo',sigla:'ATR',tipo:'numero'},recursos:{nome:'Novo Recurso',sigla:'REC',tipo:'numero'},pericias:{nome:'Nova Perícia',atributo:'',tipo:'numero'},campos:{nome:'Novo Campo',tipo:'texto',ajuda:'',opcoes:[]}};
   builderSistema[tipo].push(normalizarCampoBuilder(defaults[tipo],defaults[tipo].tipo));
   sincronizarIdsComLayout(); renderizarBuilderSistema();
 }
@@ -793,13 +803,34 @@ function renderListaBuilder(tipo){
   if(!lista.length){ el.innerHTML='<div class="estado-galeria">Nenhum campo configurado.</div>'; return; }
   el.innerHTML=lista.map((item,i)=>{
     const nav=`<div class="builder-movimento"><button type="button" onclick="moverCampoSistema('${tipo}',${i},-1)" ${i===0?'disabled':''}>↑</button><button type="button" onclick="moverCampoSistema('${tipo}',${i},1)" ${i===lista.length-1?'disabled':''}>↓</button></div>`;
-    const obrig=`<label class="builder-check"><input type="checkbox" ${item.obrigatorio?'checked':''} onchange="atualizarCampoSistema('${tipo}',${i},'obrigatorio',this.checked)"> obrigatório</label>`;
     const tipoSelect=`<select onchange="atualizarCampoSistema('${tipo}',${i},'tipo',this.value)">${TIPOS_CAMPO.map(t=>`<option value="${t.value}" ${item.tipo===t.value?'selected':''}>${t.label}</option>`).join('')}</select>`;
-    const comum=`<input value="${escSistema(item.nome)}" oninput="atualizarCampoSistema('${tipo}',${i},'nome',this.value)" placeholder="Nome">${tipo==='atributos'||tipo==='recursos'?`<input value="${escSistema(item.sigla||'')}" maxlength="8" oninput="atualizarCampoSistema('${tipo}',${i},'sigla',this.value)" placeholder="Sigla">`:''}${tipo==='pericias'?`<input value="${escSistema(item.atributo||'')}" oninput="atualizarCampoSistema('pericias',${i},'atributo',this.value)" placeholder="Atributo relacionado">`:''}${tipo==='recursos'?tipoSelect:''}${tipo==='campos'?tipoSelect:''}`;
-    return `<div class="builder-item-avancado"><div class="builder-linha">${comum}<button type="button" class="btn-remover-campo" onclick="removerCampoSistema('${tipo}',${i})">✕</button></div><div class="builder-opcoes">${obrig}<label>Colunas <select onchange="atualizarCampoSistema('${tipo}',${i},'largura',this.value)"><option value="1" ${Number(item.largura)===1?'selected':''}>1</option><option value="2" ${Number(item.largura)===2?'selected':''}>2</option><option value="3" ${Number(item.largura)===3?'selected':''}>3</option><option value="4" ${Number(item.largura)===4?'selected':''}>4</option></select></label>${nav}</div></div>`;
+    const opcoes=(item.opcoes||[]).join(', ');
+    return `<details class="builder-item-avancado" open>
+      <summary><span><strong>${escSistema(item.nome||'Campo')}</strong><small>${escSistema(item.sigla||item.tipo||'campo')}</small></span><span>${nav}</span></summary>
+      <div class="builder-item-corpo">
+        <div class="builder-linha"><input value="${escSistema(item.nome)}" oninput="atualizarCampoSistema('${tipo}',${i},'nome',this.value);renderizarPreviewBuilder()" placeholder="Nome">
+        ${tipo==='atributos'||tipo==='recursos'?`<input value="${escSistema(item.sigla||'')}" maxlength="8" oninput="atualizarCampoSistema('${tipo}',${i},'sigla',this.value)" placeholder="Sigla">`:''}
+        ${tipo==='pericias'?`<input value="${escSistema(item.atributo||'')}" oninput="atualizarCampoSistema('pericias',${i},'atributo',this.value)" placeholder="Atributo relacionado">`:''}
+        <button type="button" class="btn-remover-campo" onclick="removerCampoSistema('${tipo}',${i})">✕</button></div>
+        <div class="builder-opcoes builder-opcoes-avancadas">
+          <label>Tipo ${tipoSelect}</label>
+          <label>Colunas <select onchange="atualizarCampoSistema('${tipo}',${i},'largura',this.value)">${[1,2,3,4].map(n=>`<option value="${n}" ${Number(item.largura)===n?'selected':''}>${n}</option>`).join('')}</select></label>
+          <label class="builder-check"><input type="checkbox" ${item.obrigatorio?'checked':''} onchange="atualizarCampoSistema('${tipo}',${i},'obrigatorio',this.checked)"> obrigatório</label>
+          <label class="builder-check"><input type="checkbox" ${item.calculado?'checked':''} onchange="atualizarCampoSistema('${tipo}',${i},'calculado',this.checked);renderizarBuilderSistema()"> calculado</label>
+        </div>
+        <div class="builder-opcoes builder-opcoes-avancadas">
+          <label>Placeholder <input value="${escSistema(item.placeholder)}" oninput="atualizarCampoSistema('${tipo}',${i},'placeholder',this.value)"></label>
+          <label>Valor padrão <input value="${escSistema(item.valor_padrao)}" oninput="atualizarCampoSistema('${tipo}',${i},'valor_padrao',this.value)"></label>
+          <label>Ajuda <input value="${escSistema(item.ajuda)}" oninput="atualizarCampoSistema('${tipo}',${i},'ajuda',this.value)"></label>
+          ${item.tipo==='select'?`<label>Opções <input value="${escSistema(opcoes)}" oninput="atualizarCampoSistema('${tipo}',${i},'opcoes',this.value.split(',').map(x=>x.trim()).filter(Boolean))" placeholder="Humano, Elfo, Orc"></label>`:''}
+          ${item.tipo==='numero'?`<label>Valor máximo <input type="number" value="${escSistema(item.valor_maximo)}" oninput="atualizarCampoSistema('${tipo}',${i},'valor_maximo',this.value)"></label>`:''}
+          ${item.calculado?`<label class="builder-formula">Fórmula <input value="${escSistema(item.formula)}" oninput="atualizarCampoSistema('${tipo}',${i},'formula',this.value)" placeholder="FOR + DES + 2"></label>`:''}
+          ${item.tipo==='numero'?`<label>Rolagem <input value="${escSistema(item.rolagem)}" oninput="atualizarCampoSistema('${tipo}',${i},'rolagem',this.value)" placeholder="1d20 + FOR"></label>`:''}
+        </div>
+      </div>
+    </details>`;
   }).join('');
 }
-
 function adicionarSecaoSistema(){
   builderSistema.secoes.push(normalizarSecao({titulo:'Nova seção',icone:'◆',colunas:1,campos:[]}));
   renderizarSecoesBuilder();
@@ -854,13 +885,13 @@ async function editarSistema(id){
   document.getElementById('sistema-editando-id').value=s.id;
   document.getElementById('titulo-editor-sistema').textContent='⚒️ Editar sistema';
   document.getElementById('novo-sistema-nome').value=s.nome||''; document.getElementById('novo-sistema-descricao').value=s.descricao||'';
-  iniciarBuilderSistema(s.configuracao||{}); document.getElementById('painel-novo-sistema').style.display='block'; document.getElementById('novo-sistema-nome').focus();
+  iniciarBuilderSistema(s.configuracao||{}); const tema=s.configuracao?.tema||{}; if(document.getElementById('sistema-cor-primaria')) document.getElementById('sistema-cor-primaria').value=tema.corPrimaria||'#c5a059'; if(document.getElementById('sistema-cor-fundo')) document.getElementById('sistema-cor-fundo').value=tema.corFundo||'#080a0f'; if(document.getElementById('sistema-cor-painel')) document.getElementById('sistema-cor-painel').value=tema.corPainel||'#151821'; document.getElementById('painel-novo-sistema').style.display='block'; document.getElementById('novo-sistema-nome').focus();
 }
 async function salvarSistema(){
   if(!ehMestreGlobal) return; const nome=document.getElementById('novo-sistema-nome')?.value.trim(); if(!nome)return mostrarPopup('❌ Informe o nome do sistema.');
   const descricao=document.getElementById('novo-sistema-descricao')?.value.trim()||''; const id=document.getElementById('sistema-editando-id')?.value||null;
   sincronizarIdsComLayout();
-  const config={versao:2,tipo:'generico',dados:[...builderSistema.dados],atributos:builderSistema.atributos.map(x=>({...x})),recursos:builderSistema.recursos.map(x=>({...x})),pericias:builderSistema.pericias.map(x=>({...x})),campos:builderSistema.campos.map(x=>({...x})),secoes:builderSistema.secoes.map(x=>({...x,campos:[...x.campos]})),ficha:'ficha-generica.html'};
+  const config={versao:3,tipo:'generico',dados:[...builderSistema.dados],atributos:builderSistema.atributos.map(x=>({...x})),recursos:builderSistema.recursos.map(x=>({...x})),pericias:builderSistema.pericias.map(x=>({...x})),campos:builderSistema.campos.map(x=>({...x})),secoes:builderSistema.secoes.map(x=>({...x,campos:[...x.campos]})),tema:{corPrimaria:document.getElementById('sistema-cor-primaria')?.value||'#c5a059',corFundo:document.getElementById('sistema-cor-fundo')?.value||'#080a0f',corPainel:document.getElementById('sistema-cor-painel')?.value||'#151821'},ficha:'ficha-generica.html'};
   let q=supabaseClient.from('sistemas'); const payload={nome,descricao,configuracao:config,updated_at:new Date().toISOString()};
   const result=id?await q.update(payload).eq('id',id).select().single():await q.insert({...payload,criado_por:(await supabaseClient.auth.getUser()).data.user?.id}).select().single();
   if(result.error)return mostrarPopup('❌ Erro ao salvar sistema: '+result.error.message);
@@ -1037,7 +1068,7 @@ function abrirEditorFichaAtual() {
   const modal = document.getElementById('modal-criador-ficha');
   const iframe = document.getElementById('iframe-criador-ficha');
   if (!modal || !iframe) return;
-  iframe.src = 'ficha-editor.html?modo=edicao&t=' + Date.now();
+  iframe.src = (sistemaAtual?.configuracao?.tipo === 'legado' || sistemaAtual?.configuracao?.ficha === 'ficha-editor.html') ? ('ficha-editor.html?modo=edicao&t=' + Date.now()) : ('ficha-generica.html?modo=edicao&sistema=' + encodeURIComponent(sistemaAtual?.id || '') + '&t=' + Date.now());
   modal.style.display = 'flex';
   iframe.addEventListener('load', function carregarEdicaoUmaVez() {
     iframe.removeEventListener('load', carregarEdicaoUmaVez);
@@ -1052,7 +1083,7 @@ function abrirEditorFicha(dados, userId = null) {
   if (!modal || !iframe) return;
 
   fichaEditandoUserId = userId;
-  iframe.src = 'ficha-editor.html?modo=edicao&t=' + Date.now();
+  iframe.src = (sistemaAtual?.configuracao?.tipo === 'legado' || sistemaAtual?.configuracao?.ficha === 'ficha-editor.html') ? ('ficha-editor.html?modo=edicao&t=' + Date.now()) : ('ficha-generica.html?modo=edicao&sistema=' + encodeURIComponent(sistemaAtual?.id || '') + '&t=' + Date.now());
   modal.style.display = 'flex';
   iframe.addEventListener('load', function carregarEdicaoUmaVez() {
     iframe.removeEventListener('load', carregarEdicaoUmaVez);

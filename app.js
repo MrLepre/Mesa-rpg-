@@ -893,7 +893,7 @@ function executarAdicionarTokenMesa(tamanho = 45, imagem = '', hpMax = 50, hpAtu
 }
 
 function criarElementoToken(id, nome, x, y, tamanho = 45, imagem = '', hpAtual = 50, hpMax = 50, ehMeu = false) {
-  let camada = document.getElementById('vtt-tokens-camada');
+  const camada = document.getElementById('vtt-tokens-camada');
   if (!camada) return;
 
   let token = document.getElementById(id);
@@ -904,12 +904,19 @@ function criarElementoToken(id, nome, x, y, tamanho = 45, imagem = '', hpAtual =
     camada.appendChild(token);
   }
 
+  token.dataset.tokenId = id;
+  token.dataset.tokenNome = nome;
+  token.dataset.tokenTamanho = tamanho;
+  token.dataset.tokenImagem = imagem;
+  token.dataset.tokenHpAtual = hpAtual;
+  token.dataset.tokenHpMax = hpMax;
+
   token.style.width = `${tamanho}px`;
   token.style.height = `${tamanho}px`;
   token.style.borderRadius = '50%';
   token.style.position = 'absolute';
   token.style.transform = 'translate(-50%, -50%)';
-  token.style.cursor = 'pointer';
+  token.style.cursor = 'grab';
   token.style.boxShadow = '0 2px 6px rgba(0,0,0,0.6)';
   token.style.border = '2px solid #f3d075';
   token.style.display = 'flex';
@@ -920,6 +927,7 @@ function criarElementoToken(id, nome, x, y, tamanho = 45, imagem = '', hpAtual =
   token.style.color = '#fff';
   token.style.overflow = 'visible';
   token.style.touchAction = 'none';
+  token.style.pointerEvents = 'auto';
 
   if (imagem) {
     token.style.backgroundImage = `url(${imagem})`;
@@ -929,12 +937,11 @@ function criarElementoToken(id, nome, x, y, tamanho = 45, imagem = '', hpAtual =
   } else {
     token.style.backgroundImage = 'none';
     token.style.backgroundColor = '#202024';
-    token.innerText = nome.substring(0, 3).toUpperCase();
+    token.innerText = String(nome || '').substring(0, 3).toUpperCase();
   }
 
   token.style.left = `${x}%`;
   token.style.top = `${y}%`;
-  token.style.pointerEvents = 'auto';
 
   let hpTag = token.querySelector('.vtt-token-hp');
   if (!hpTag) {
@@ -946,91 +953,173 @@ function criarElementoToken(id, nome, x, y, tamanho = 45, imagem = '', hpAtual =
   hpTag.innerText = `${hpAtual}/${hpMax}`;
   hpTag.style.color = hpAtual <= (hpMax * 0.25) ? '#ff5252' : (hpAtual <= (hpMax * 0.5) ? '#ffab40' : '#04d361');
 
-  if (ehMeu || ehMestreGlobal) {
-    ativarArrastoToken(token, id, nome, tamanho, imagem, hpAtual, hpMax);
+  // O listener é instalado apenas uma vez. Antes, cada atualização realtime
+  // adicionava novos listeners ao window, causando atraso e movimento pesado.
+  if ((ehMeu || ehMestreGlobal) && !token.dataset.arrastoConfigurado) {
+    token.dataset.arrastoConfigurado = 'true';
+    ativarArrastoToken(token);
   }
 }
 
-function ativarArrastoToken(token, id, nome, tamanho, imagem, hpAtual, hpMax) {
+function obterCoordenadasTokenPeloCursor(clientX, clientY) {
+  const scaler = document.getElementById('vtt-mapa-scaler');
+  const canvas = document.getElementById('vtt-canvas');
+  if (!scaler || !canvas) return null;
+
+  const rect = scaler.getBoundingClientRect();
+  if (!rect.width || !rect.height) return null;
+
+  // Usa a caixa REAL do elemento já transformado. Assim o cálculo acompanha
+  // zoom e pan e o token fica exatamente sob o cursor.
+  let x = ((clientX - rect.left) / rect.width) * 100;
+  let y = ((clientY - rect.top) / rect.height) * 100;
+
+  return {
+    x: Math.max(0, Math.min(100, x)),
+    y: Math.max(0, Math.min(100, y))
+  };
+}
+
+function atualizarPosicaoTokenLocal(token, x, y) {
+  token.style.left = `${x}%`;
+  token.style.top = `${y}%`;
+}
+
+function transmitirMovimentoToken(token, x, y) {
+  if (!canalMesa) return;
+
+  const agora = performance.now();
+  const ultimo = Number(token.dataset.ultimoBroadcast || 0);
+  const intervalo = 35;
+
+  token.dataset.broadcastX = x;
+  token.dataset.broadcastY = y;
+
+  if (agora - ultimo < intervalo) {
+    if (!token._broadcastAgendado) {
+      token._broadcastAgendado = requestAnimationFrame(() => {
+        token._broadcastAgendado = null;
+        const bx = Number(token.dataset.broadcastX);
+        const by = Number(token.dataset.broadcastY);
+        transmitirMovimentoToken(token, bx, by);
+      });
+    }
+    return;
+  }
+
+  token.dataset.ultimoBroadcast = String(agora);
+
+  canalMesa.send({
+    type: 'broadcast',
+    event: 'vtt_mover_token',
+    payload: {
+      id: token.dataset.tokenId,
+      nome: token.dataset.tokenNome,
+      x,
+      y,
+      tamanho: Number(token.dataset.tokenTamanho) || 45,
+      imagem: token.dataset.tokenImagem || '',
+      hpAtual: Number(token.dataset.tokenHpAtual) || 0,
+      hpMax: Number(token.dataset.tokenHpMax) || 50
+    }
+  });
+}
+
+function ativarArrastoToken(token) {
   let arrastando = false;
   let moveuDeFato = false;
+  let ponteiroAtivo = null;
+  let ultimoX = 0;
+  let ultimoY = 0;
 
   const iniciarArrasto = (e) => {
+    // Apenas botão esquerdo no mouse.
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+
     arrastando = true;
     moveuDeFato = false;
+    ponteiroAtivo = e.pointerId;
+    ultimoX = e.clientX;
+    ultimoY = e.clientY;
+
+    token.setPointerCapture?.(e.pointerId);
+    token.style.cursor = 'grabbing';
+    token.classList.add('arrastando');
+
     e.stopPropagation();
     e.preventDefault();
   };
 
   const mover = (e) => {
     if (!arrastando) return;
+    if (ponteiroAtivo !== null && e.pointerId !== ponteiroAtivo) return;
+
+    // Ignora microscopicamente o mesmo ponto e reduz trabalho desnecessário.
+    if (e.clientX === ultimoX && e.clientY === ultimoY) return;
+    ultimoX = e.clientX;
+    ultimoY = e.clientY;
+
+    const pos = obterCoordenadasTokenPeloCursor(e.clientX, e.clientY);
+    if (!pos) return;
+
     moveuDeFato = true;
-    const canvas = document.getElementById('vtt-canvas');
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
+    atualizarPosicaoTokenLocal(token, pos.x, pos.y);
+    transmitirMovimentoToken(token, pos.x, pos.y);
 
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-    let x = ((clientX - rect.left) / rect.width) * 100;
-    let y = ((clientY - rect.top) / rect.height) * 100;
-
-    x = Math.max(0, Math.min(100, x));
-    y = Math.max(0, Math.min(100, y));
-
-    token.style.left = `${x}%`;
-    token.style.top = `${y}%`;
-
-    if (canalMesa) {
-      canalMesa.send({
-        type: 'broadcast',
-        event: 'vtt_mover_token',
-        payload: { id, nome, x, y, tamanho, imagem, hpAtual, hpMax }
-      });
-    }
+    e.stopPropagation();
     e.preventDefault();
   };
 
   const pararArrasto = (e) => {
-    if (arrastando && !moveuDeFato) {
-      e.stopPropagation();
+    if (!arrastando) return;
+    if (ponteiroAtivo !== null && e.pointerId !== ponteiroAtivo) return;
+
+    arrastando = false;
+    token.releasePointerCapture?.(ponteiroAtivo);
+    ponteiroAtivo = null;
+    token.style.cursor = 'grab';
+    token.classList.remove('arrastando');
+
+    if (!moveuDeFato) {
+      const nome = token.dataset.tokenNome || 'Personagem';
+      let hpAtual = Number(token.dataset.tokenHpAtual) || 0;
+      const hpMax = Number(token.dataset.tokenHpMax) || 50;
+
       const novoHpStr = prompt(`Gerenciar HP de ${nome} (${hpAtual}/${hpMax}):\nDigite o novo valor ou ajuste com + / - (ex: -5, +5):`, hpAtual);
       if (novoHpStr !== null) {
-        let calculado = hpAtual;
         const valorTrim = novoHpStr.trim();
+        let calculado = hpAtual;
+
         if (valorTrim.startsWith('+') || valorTrim.startsWith('-')) {
-          calculado = Math.max(0, Math.min(hpMax, hpAtual + parseInt(valorTrim)));
+          calculado = Math.max(0, Math.min(hpMax, hpAtual + (parseInt(valorTrim, 10) || 0)));
         } else {
-          calculado = Math.max(0, Math.min(hpMax, parseInt(valorTrim) || 0));
+          calculado = Math.max(0, Math.min(hpMax, parseInt(valorTrim, 10) || 0));
         }
 
         hpAtual = calculado;
-        let hpTag = token.querySelector('.vtt-token-hp');
+        token.dataset.tokenHpAtual = String(hpAtual);
+
+        const hpTag = token.querySelector('.vtt-token-hp');
         if (hpTag) {
           hpTag.innerText = `${hpAtual}/${hpMax}`;
           hpTag.style.color = hpAtual <= (hpMax * 0.25) ? '#ff5252' : (hpAtual <= (hpMax * 0.5) ? '#ffab40' : '#04d361');
         }
 
-        if (canalMesa) {
-          canalMesa.send({
-            type: 'broadcast',
-            event: 'vtt_mover_token',
-            payload: { id, nome, x: parseFloat(token.style.left), y: parseFloat(token.style.top), tamanho, imagem, hpAtual, hpMax }
-          });
-        }
+        const x = parseFloat(token.style.left) || 0;
+        const y = parseFloat(token.style.top) || 0;
+        transmitirMovimentoToken(token, x, y);
         mostrarPopup(`❤️ HP de ${nome} atualizado: ${hpAtual}/${hpMax}`);
       }
     }
-    arrastando = false;
+
+    e.stopPropagation();
+    e.preventDefault();
   };
 
-  token.onmousedown = iniciarArrasto;
-  token.ontouchstart = iniciarArrasto;
-
-  window.addEventListener('mousemove', mover);
-  window.addEventListener('mouseup', pararArrasto);
-  window.addEventListener('touchmove', mover, { passive: false });
-  window.addEventListener('touchend', pararArrasto);
+  token.addEventListener('pointerdown', iniciarArrasto);
+  token.addEventListener('pointermove', mover);
+  token.addEventListener('pointerup', pararArrasto);
+  token.addEventListener('pointercancel', pararArrasto);
 }
 
 // --- ROLAGENS DE DADOS ---

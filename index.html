@@ -154,27 +154,78 @@
     </section>
 
     <section id="aba-galeria" class="painel">
-      <h2>Galeria e Recursos Visuais</h2>
-      <div style="background: #202024; padding: 15px; border-radius: 6px; margin-bottom: 15px;">
-        <h3>Enviar Imagem</h3>
-        <input type="file" id="arquivo-imagem" accept="image/*" style="margin-bottom: 10px; display: block;">
-        <select id="categoria-imagem" style="margin-bottom: 10px; padding: 6px; background: #121214; color: #fff; border: 1px solid #29292e; border-radius: 4px;">
-          <option value="Personagens">Personagens</option>
-          <option value="Locais">Locais</option>
-          <option value="Itens">Itens</option>
-          <option value="Inimigos">Inimigos</option>
-          <option value="Outros">Outros</option>
-        </select>
-        <button onclick="fazerUploadImagem()" style="background: #8257e5; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; display: block;">Enviar para Galeria</button>
-      </div>
-      <div>
-        <h3>Galeria Geral</h3>
-        <div id="galeria-grid">
-          <p style="color: #a8a8b3;">Carregando galeria...</p>
+      <div class="cabecalho-galeria">
+        <div>
+          <span class="eyebrow-galeria">📚 Biblioteca visual da campanha</span>
+          <h2>Galeria e Recursos Visuais</h2>
+          <p class="subtexto-galeria">Organize imagens por pastas e escolha o que fica visível para o grupo.</p>
         </div>
+        <div id="status-galeria" class="status-galeria">Sincronizada</div>
+      </div>
+
+      <div id="painel-galeria-mestre" class="card-galeria-mestre" style="display:none;">
+        <div class="titulo-painel-galeria">
+          <div>
+            <strong>👑 Biblioteca do Mestre</strong>
+            <small>Envie e organize os recursos visuais da campanha.</small>
+          </div>
+        </div>
+        <div class="form-galeria-mestre">
+          <label class="campo-galeria">
+            <span>Imagem</span>
+            <input type="file" id="arquivo-imagem" accept="image/*">
+          </label>
+          <label class="campo-galeria">
+            <span>Nome</span>
+            <input type="text" id="nome-imagem" maxlength="120" placeholder="Ex.: Retrato de Arthur">
+          </label>
+          <label class="campo-galeria">
+            <span>Pasta</span>
+            <input type="text" id="pasta-imagem" maxlength="60" value="Geral" placeholder="Ex.: NPCs">
+          </label>
+          <label class="campo-galeria">
+            <span>Visibilidade</span>
+            <select id="visibilidade-imagem">
+              <option value="publica">🌐 Visível para os jogadores</option>
+              <option value="oculta">🔒 Oculta para os jogadores</option>
+            </select>
+          </label>
+          <button onclick="fazerUploadImagem()" class="btn-publicar-galeria">📤 Adicionar à Biblioteca</button>
+        </div>
+      </div>
+
+      <div class="barra-pastas-galeria">
+        <div>
+          <span class="rotulo-pastas">PASTAS</span>
+          <div id="galeria-pastas" class="galeria-pastas">
+            <button class="pasta-galeria ativa" onclick="filtrarGaleriaPasta('Todas', event)">📚 Todas</button>
+          </div>
+        </div>
+        <button id="btn-atualizar-galeria" class="btn-atualizar-galeria" onclick="carregarGaleria(true)">↻ Atualizar</button>
+      </div>
+
+      <div id="galeria-grid" class="galeria-grid-profissional">
+        <div class="estado-galeria">Carregando biblioteca...</div>
       </div>
     </section>
   </main>
+
+  <div id="modal-imagem-mestre" class="modal-imagem-mestre" style="display:none;" role="dialog" aria-modal="true" aria-label="Imagem compartilhada pelo Mestre">
+    <div class="imagem-mestre-backdrop" onclick="fecharImagemMestre()"></div>
+    <div class="imagem-mestre-conteudo">
+      <div class="imagem-mestre-cabecalho">
+        <div>
+          <span class="imagem-mestre-kicker">👑 O MESTRE MOSTROU</span>
+          <h2 id="imagem-mestre-titulo">Imagem da campanha</h2>
+          <span id="imagem-mestre-pasta" class="imagem-mestre-pasta">Geral</span>
+        </div>
+        <button type="button" onclick="fecharImagemMestre()" class="btn-fechar-imagem-mestre" aria-label="Fechar imagem">✕</button>
+      </div>
+      <div class="imagem-mestre-palco">
+        <img id="imagem-mestre-preview" src="" alt="Imagem compartilhada pelo Mestre">
+      </div>
+    </div>
+  </div>
 
   <div id="modal-ficha-grupo" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 9998; justify-content: center; align-items: center; padding: 20px;">
     <div class="modal-ficha-grupo-conteudo">

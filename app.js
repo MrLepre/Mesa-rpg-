@@ -21,6 +21,11 @@ let vttMovimentoLivre = false;
 let mapaModoImersivo = false;
 let audioContext = null;
 let ultimoTokenInteragido = null;
+let abasCarregadas = { mapa: false, galeria: false };
+let abaAtual = 'ficha';
+let pastaGaleriaAtual = 'Todas';
+let dadosGaleriaAtual = [];
+let imagemMestreAberta = false;
 
 // --- FEEDBACK SONORO E TÁTIL (sem arquivos externos) ---
 function tocarSom(tipo = 'click') {
@@ -92,6 +97,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   atualizarStatusConexao(supabaseClient ? 'online' : 'offline', supabaseClient ? 'Conectando à Távola...' : 'Modo local — Supabase indisponível.');
 
+  try {
+    const abaSalva = localStorage.getItem('cronicas_camelot_aba');
+    if (['ficha', 'grupo', 'mapa', 'rolagens', 'galeria'].includes(abaSalva)) {
+      mudarAba(abaSalva);
+    }
+  } catch (err) {}
+
   if (supabaseClient) {
     try {
       const { data: { session } } = await supabaseClient.auth.getSession();
@@ -99,6 +111,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       if (session?.user) {
         carregarFichaDoUsuario(session.user.id);
+      }
+
+      // Se a aba restaurada precisar de dados remotos, carregue somente agora
+      // que o Supabase está pronto.
+      if (abaAtual === 'mapa' && !abasCarregadas.mapa) {
+        abasCarregadas.mapa = true;
+        carregarMapaAtual();
+      }
+      if (abaAtual === 'galeria' && !abasCarregadas.galeria) {
+        abasCarregadas.galeria = true;
+        carregarGaleria();
       }
 
       canalMesa = supabaseClient.channel('sala-rpg-geral');
@@ -115,6 +138,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         })
         .on('broadcast', { event: 'nova_rolagem' }, (payload) => {
           registrarRolagemHistorico(payload.payload.descricao, payload.payload.resultado, true);
+        })
+        .on('broadcast', { event: 'galeria_mostrar_imagem' }, (payload) => {
+          const dados = payload.payload || {};
+          if (dados.url) abrirImagemMestre(dados.url, dados.nome || 'Imagem da campanha', dados.pasta || 'Geral', true);
+        })
+        .on('broadcast', { event: 'galeria_fechar_imagem' }, () => {
+          fecharImagemMestre(true);
         })
         .on('broadcast', { event: 'vtt_ping' }, (payload) => {
           criarEfeitoPing(payload.payload.x, payload.payload.y);
@@ -137,8 +167,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') atualizarStatusConexao('offline', 'Sincronização indisponível');
         });
 
-      carregarMapaAtual();
-      carregarGaleria();
+      // Mapa e galeria agora carregam sob demanda, quando o jogador abre a aba.
+      // Isso reduz consultas e trabalho inicial sem alterar o conteúdo dessas abas.
     } catch (err) {
       atualizarStatusConexao('offline', 'Erro de conexão');
       console.error('Erro na sessão/conexão:', err);
@@ -163,6 +193,7 @@ document.addEventListener('keydown', (event) => {
     if (typeof fecharModalFichaGrupo === 'function') fecharModalFichaGrupo();
     const visualizador = document.getElementById('modal-visualizador-img');
     if (visualizador) visualizador.style.display = 'none';
+    if (typeof fecharImagemMestre === 'function' && imagemMestreAberta) fecharImagemMestre();
     return;
   }
   if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
@@ -259,6 +290,7 @@ function atualizarInterfaceAuth(user) {
   const statusUsuario = document.getElementById('status-usuario');
   const painelMapaMestre = document.getElementById('painel-mapa-mestre');
   const painelUploadMestre = document.getElementById('painel-upload-mestre');
+  const painelGaleriaMestre = document.getElementById('painel-galeria-mestre');
   const badgeMestre = document.getElementById('badge-mestre');
 
   if (user) {
@@ -274,10 +306,12 @@ function atualizarInterfaceAuth(user) {
       if (badgeMestre) badgeMestre.style.display = 'inline-block';
       if (painelMapaMestre) painelMapaMestre.style.display = 'block';
       if (painelUploadMestre) painelUploadMestre.style.display = 'block';
+      if (painelGaleriaMestre) painelGaleriaMestre.style.display = 'block';
     } else {
       if (badgeMestre) badgeMestre.style.display = 'none';
       if (painelMapaMestre) painelMapaMestre.style.display = 'none';
       if (painelUploadMestre) painelUploadMestre.style.display = 'none';
+      if (painelGaleriaMestre) painelGaleriaMestre.style.display = 'none';
     }
   } else {
     ehMestreGlobal = false;
@@ -420,6 +454,9 @@ document.addEventListener('pointerdown', (event) => {
 
 // --- NAVEGAÇÃO DE ABAS ---
 function mudarAba(nomeAba, evento) {
+  const abasValidas = ['ficha', 'grupo', 'mapa', 'rolagens', 'galeria'];
+  if (!abasValidas.includes(nomeAba)) return;
+
   const paineis = document.querySelectorAll('.painel');
   paineis.forEach(p => p.classList.remove('ativo'));
   const botoes = document.querySelectorAll('.abas-navegacao button');
@@ -430,6 +467,23 @@ function mudarAba(nomeAba, evento) {
 
   if (evento && evento.currentTarget) {
     evento.currentTarget.classList.add('ativo');
+  } else {
+    const botaoAba = document.querySelector(`.abas-navegacao button[onclick*="'${nomeAba}'"]`);
+    if (botaoAba) botaoAba.classList.add('ativo');
+  }
+
+  abaAtual = nomeAba;
+  try { localStorage.setItem('cronicas_camelot_aba', nomeAba); } catch (err) {}
+
+  // Carregamento sob demanda: a mesa abre mais rápido e cada recurso é
+  // consultado somente quando realmente é necessário.
+  if (nomeAba === 'mapa' && !abasCarregadas.mapa && supabaseClient) {
+    abasCarregadas.mapa = true;
+    carregarMapaAtual();
+  }
+  if (nomeAba === 'galeria' && !abasCarregadas.galeria && supabaseClient) {
+    abasCarregadas.galeria = true;
+    carregarGaleria();
   }
 }
 
@@ -1350,115 +1404,278 @@ function registrarRolagemHistorico(descricao, resultado, veioDoBroadcast = false
 }
 
 // --- GALERIA & IMAGENS ---
+function normalizarPastaGaleria(valor) {
+  const limpa = String(valor || 'Geral')
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return (limpa || 'Geral').slice(0, 60);
+}
+
+function escaparAtributoHTML(valor) {
+  return escaparHTML(String(valor ?? ''));
+}
+
 async function fazerUploadImagem() {
-  if (!supabaseClient) return alert('Supabase não conectado.');
+  if (!supabaseClient) return mostrarPopup('❌ Supabase não conectado.');
+  if (!ehMestreGlobal) return mostrarPopup('❌ Apenas o Mestre pode organizar a biblioteca.');
+
   const input = document.getElementById('arquivo-imagem');
-  const categoriaSelect = document.getElementById('categoria-imagem');
-  if (!input || !input.files || input.files.length === 0) return alert('Selecione uma imagem!');
-  const categoria = categoriaSelect ? categoriaSelect.value : 'Outros';
+  const nomeInput = document.getElementById('nome-imagem');
+  const pastaInput = document.getElementById('pasta-imagem');
+  const visibilidadeInput = document.getElementById('visibilidade-imagem');
+  if (!input || !input.files || input.files.length === 0) return mostrarPopup('❌ Selecione uma imagem.');
 
   const file = input.files[0];
   if (!file.type.startsWith('image/')) return mostrarPopup('❌ Selecione um arquivo de imagem.');
-  if (file.size > 8 * 1024 * 1024) return mostrarPopup('❌ A imagem deve ter no máximo 8 MB.');
-  const extensao = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const fileName = `galeria_${Date.now()}_${crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)}.${extensao}`;
+  if (file.size > 12 * 1024 * 1024) return mostrarPopup('❌ A imagem deve ter no máximo 12 MB.');
 
-  const { error } = await supabaseClient.storage.from('galeria').upload(fileName, file);
-  if (error) return alert('Erro no upload: ' + error.message);
+  const pasta = normalizarPastaGaleria(pastaInput?.value || 'Geral');
+  const nome = String(nomeInput?.value || file.name.replace(/\.[^.]+$/, '')).trim().slice(0, 120) || 'Imagem sem nome';
+  const publica = (visibilidadeInput?.value || 'publica') === 'publica';
+  const extensao = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
+  const identificador = (window.crypto?.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+  const storagePath = `${pasta}/${Date.now()}_${identificador}.${extensao}`;
+  const bucketGaleria = publica ? 'galeria' : 'galeria-privada';
 
-  const { data } = supabaseClient.storage.from('galeria').getPublicUrl(fileName);
-  const publicUrl = data.publicUrl;
+  const btn = document.querySelector('.btn-publicar-galeria');
+  if (btn) { btn.disabled = true; btn.dataset.textoOriginal = btn.textContent; btn.textContent = '⏳ Enviando...'; }
 
-  const { error: dbError } = await supabaseClient.from('galeria_imagens').insert({
-    url: publicUrl,
-    categoria: categoria,
-    criado_em: new Date()
-  });
+  try {
+    const { error: uploadError } = await supabaseClient.storage.from(bucketGaleria).upload(storagePath, file, { cacheControl: '3600', upsert: false });
+    if (uploadError) throw uploadError;
 
-  if (dbError) return alert('Erro ao salvar no banco: ' + dbError.message);
-
-  tocarSom('success');
-  mostrarPopup('🖼️ Imagem enviada com sucesso!');
-  carregarGaleria();
-}
-
-async function carregarGaleria() {
-  if (!supabaseClient) return;
-  const { data, error } = await supabaseClient
-    .from('galeria_imagens')
-    .select('*')
-    .order('criado_em', { ascending: false });
-
-  if (error) return;
-
-  const categorias = ['Personagens', 'Locais', 'Itens', 'Inimigos', 'Outros'];
-
-  categorias.forEach(cat => {
-    const container = document.getElementById(`galeria-${cat.toLowerCase()}`) || 
-                      document.getElementById(`grid-${cat.toLowerCase()}`);
-    
-    if (container) {
-      const imgsCat = data ? data.filter(img => img.categoria && img.categoria.toLowerCase() === cat.toLowerCase()) : [];
-      
-      if (imgsCat.length === 0) {
-        container.innerHTML = `<p style="color: #a8a8b3; font-size: 0.8rem; padding: 5px;">[${cat}]</p>`;
-      } else {
-        container.innerHTML = '';
-        container.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; padding: 8px;';
-        imgsCat.forEach(img => {
-          const card = document.createElement('div');
-          card.style.cssText = 'background: #202024; border: 1px solid #29292e; border-radius: 6px; overflow: hidden; cursor: pointer;';
-          card.innerHTML = `
-            <img loading="lazy" decoding="async" src="${escaparHTML(img.url)}" alt="${escaparHTML(img.categoria)}" style="width: 100%; height: 90px; object-fit: cover; display: block;" onerror="this.src='https://via.placeholder.com/120?text=Erro'">
-          `;
-          card.onclick = () => abrirVisualizadorImagem(img.url, img.categoria);
-          container.appendChild(card);
-        });
-      }
-    }
-  });
-
-  const gridGeral = document.getElementById('galeria-grid');
-  if (gridGeral) {
-    gridGeral.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-top: 10px;';
-    if (!data || data.length === 0) {
-      gridGeral.innerHTML = '<p style="color: #a8a8b3; font-size: 0.9rem;">Nenhuma imagem na galeria.</p>';
+    let imageUrl = null;
+    if (publica) {
+      const { data: publicData } = supabaseClient.storage.from('galeria').getPublicUrl(storagePath);
+      imageUrl = publicData?.publicUrl || null;
     } else {
-      gridGeral.innerHTML = '';
-      data.forEach(img => {
-        const card = document.createElement('div');
-        card.style.cssText = 'background: #202024; border: 1px solid #29292e; border-radius: 6px; overflow: hidden; cursor: pointer;';
-        card.innerHTML = `
-          <img loading="lazy" decoding="async" src="${escaparHTML(img.url)}" alt="${escaparHTML(img.categoria)}" style="width: 100%; height: 110px; object-fit: cover; display: block;" onerror="this.src='https://via.placeholder.com/150?text=Erro'">
-          <div style="padding: 0.3rem; font-size: 0.75rem; color: #04d361; text-align: center; background: #121214;">[${img.categoria}]</div>
-        `;
-        card.onclick = () => abrirVisualizadorImagem(img.url, img.categoria);
-        gridGeral.appendChild(card);
-      });
+      const { data: signedData, error: signedError } = await supabaseClient.storage.from('galeria-privada').createSignedUrl(storagePath, 3600);
+      if (signedError) throw signedError;
+      imageUrl = signedData?.signedUrl || null;
     }
+    if (!imageUrl) throw new Error('Não foi possível obter a URL da imagem.');
+
+    const { error: dbError } = await supabaseClient.from('galeria_imagens').insert({
+      url: imageUrl,
+      categoria: pasta,
+      pasta: pasta,
+      nome: nome,
+      publico: publica,
+      storage_path: storagePath,
+      criado_por: (await supabaseClient.auth.getUser()).data.user?.id || null,
+      criado_em: new Date().toISOString()
+    });
+    if (dbError) throw dbError;
+
+    tocarSom('success');
+    mostrarPopup(publica ? '🌐 Imagem publicada para os jogadores.' : '🔒 Imagem salva na pasta oculta.');
+    if (input) input.value = '';
+    if (nomeInput) nomeInput.value = '';
+    await carregarGaleria(true);
+  } catch (error) {
+    console.error('Erro no upload da galeria:', error);
+    mostrarPopup('❌ Erro ao enviar imagem: ' + (error.message || 'erro desconhecido'));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = btn.dataset.textoOriginal || '📤 Adicionar à Biblioteca'; }
   }
 }
 
-function abrirVisualizadorImagem(url, categoria) {
+async function prepararUrlsGaleria(imagens) {
+  const lista = Array.isArray(imagens) ? imagens : [];
+  return Promise.all(lista.map(async (img) => {
+    const item = { ...img };
+    if (!item.publico && item.storage_path) {
+      const { data, error } = await supabaseClient.storage.from('galeria-privada').createSignedUrl(item.storage_path, 3600);
+      if (!error && data?.signedUrl) item.url = data.signedUrl;
+    }
+    return item;
+  }));
+}
+
+async function carregarGaleria(forcar = false) {
+  if (!supabaseClient) return;
+  const status = document.getElementById('status-galeria');
+  if (status) status.textContent = 'Sincronizando...';
+
+  let query = supabaseClient
+    .from('galeria_imagens')
+    .select('id,url,categoria,pasta,nome,publico,storage_path,criado_em,criado_por')
+    .order('criado_em', { ascending: false });
+
+  if (!ehMestreGlobal) query = query.eq('publico', true);
+
+  const { data, error } = await query;
+  if (error) {
+    console.error('Erro ao carregar galeria:', error);
+    if (status) status.textContent = 'Erro de sincronização';
+    const grid = document.getElementById('galeria-grid');
+    if (grid) grid.innerHTML = '<div class="estado-galeria">Não foi possível carregar a biblioteca.</div>';
+    return;
+  }
+
+  dadosGaleriaAtual = await prepararUrlsGaleria(data);
+  renderizarPastasGaleria(dadosGaleriaAtual);
+  renderizarGaleria(dadosGaleriaAtual);
+  if (status) status.textContent = `${dadosGaleriaAtual.length} recurso${dadosGaleriaAtual.length === 1 ? '' : 's'}`;
+}
+
+function renderizarPastasGaleria(imagens) {
+  const container = document.getElementById('galeria-pastas');
+  if (!container) return;
+
+  const nomes = [...new Set(imagens.map(img => String(img.pasta || img.categoria || 'Geral')).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const todas = ['Todas', ...nomes];
+  if (!todas.includes(pastaGaleriaAtual)) pastaGaleriaAtual = 'Todas';
+
+  container.innerHTML = '';
+  todas.forEach(pasta => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'pasta-galeria' + (pasta === pastaGaleriaAtual ? ' ativa' : '');
+    btn.textContent = pasta === 'Todas' ? '📚 Todas' : `📁 ${pasta}`;
+    btn.onclick = (event) => filtrarGaleriaPasta(pasta, event);
+    container.appendChild(btn);
+  });
+}
+
+function filtrarGaleriaPasta(pasta, event) {
+  pastaGaleriaAtual = pasta || 'Todas';
+  document.querySelectorAll('#galeria-pastas .pasta-galeria').forEach(btn => btn.classList.remove('ativa'));
+  if (event?.currentTarget) event.currentTarget.classList.add('ativa');
+  else document.querySelectorAll('#galeria-pastas .pasta-galeria').forEach(btn => {
+    const texto = btn.textContent.replace(/^📚 |^📁 /, '');
+    if (texto === pastaGaleriaAtual) btn.classList.add('ativa');
+  });
+  renderizarGaleria(dadosGaleriaAtual);
+}
+
+function renderizarGaleria(imagens) {
+  const grid = document.getElementById('galeria-grid');
+  if (!grid) return;
+
+  const filtradas = pastaGaleriaAtual === 'Todas'
+    ? imagens
+    : imagens.filter(img => String(img.pasta || img.categoria || 'Geral') === pastaGaleriaAtual);
+
+  if (!filtradas.length) {
+    grid.innerHTML = `<div class="estado-galeria">${pastaGaleriaAtual === 'Todas' ? 'Nenhuma imagem na biblioteca.' : 'Esta pasta está vazia.'}</div>`;
+    return;
+  }
+
+  grid.innerHTML = '';
+  const fragment = document.createDocumentFragment();
+  filtradas.forEach(img => {
+    const pasta = String(img.pasta || img.categoria || 'Geral');
+    const nome = String(img.nome || 'Imagem sem nome');
+    const card = document.createElement('article');
+    card.className = 'card-imagem-galeria' + (img.publico ? '' : ' imagem-oculta');
+
+    const media = document.createElement('div');
+    media.className = 'thumb-galeria';
+    const image = document.createElement('img');
+    image.loading = 'lazy';
+    image.decoding = 'async';
+    image.src = img.url;
+    image.alt = nome;
+    image.onerror = () => { image.style.opacity = '0.25'; };
+    media.appendChild(image);
+
+    const info = document.createElement('div');
+    info.className = 'info-imagem-galeria';
+    const titulo = document.createElement('strong');
+    titulo.textContent = nome;
+    const meta = document.createElement('span');
+    meta.textContent = `${img.publico ? '🌐 Público' : '🔒 Oculto'} · ${pasta}`;
+    info.append(titulo, meta);
+
+    const acoes = document.createElement('div');
+    acoes.className = 'acoes-imagem-galeria';
+    const btnAbrir = document.createElement('button');
+    btnAbrir.type = 'button';
+    btnAbrir.className = 'btn-mini-galeria';
+    btnAbrir.textContent = '🔎 Abrir';
+    btnAbrir.onclick = () => abrirVisualizadorImagem(img.url, pasta, nome);
+    acoes.appendChild(btnAbrir);
+
+    if (ehMestreGlobal) {
+      const btnMostrar = document.createElement('button');
+      btnMostrar.type = 'button';
+      btnMostrar.className = 'btn-mini-galeria btn-mostrar-galeria';
+      btnMostrar.textContent = '📺 Mostrar para todos';
+      btnMostrar.onclick = () => mostrarImagemParaTodos(img);
+      acoes.appendChild(btnMostrar);
+    }
+
+    card.append(media, info, acoes);
+    fragment.appendChild(card);
+  });
+  grid.appendChild(fragment);
+}
+
+function mostrarImagemParaTodos(img) {
+  if (!ehMestreGlobal || !img?.url || !canalMesa) return mostrarPopup('❌ Apenas o Mestre pode mostrar imagens.');
+  const dados = {
+    url: img.url,
+    nome: img.nome || 'Imagem da campanha',
+    pasta: img.pasta || img.categoria || 'Geral'
+  };
+  abrirImagemMestre(dados.url, dados.nome, dados.pasta, false);
+  canalMesa.send({ type: 'broadcast', event: 'galeria_mostrar_imagem', payload: dados });
+  tocarSom('success');
+  mostrarPopup('📺 Imagem enviada para todos os jogadores.');
+}
+
+function abrirImagemMestre(url, nome, pasta, veioDoBroadcast = false) {
+  const modal = document.getElementById('modal-imagem-mestre');
+  const img = document.getElementById('imagem-mestre-preview');
+  const titulo = document.getElementById('imagem-mestre-titulo');
+  const pastaEl = document.getElementById('imagem-mestre-pasta');
+  if (!modal || !img) return;
+
+  img.src = url;
+  if (titulo) titulo.textContent = nome || 'Imagem da campanha';
+  if (pastaEl) pastaEl.textContent = pasta || 'Geral';
+  modal.style.display = 'flex';
+  imagemMestreAberta = true;
+  document.body.classList.add('imagem-mestre-aberta');
+  if (veioDoBroadcast) {
+    tocarSom('ping');
+    vibrarPadrao([20, 30, 20]);
+  }
+}
+
+function fecharImagemMestre(veioDoBroadcast = false) {
+  const modal = document.getElementById('modal-imagem-mestre');
+  if (!modal) return;
+  modal.style.display = 'none';
+  imagemMestreAberta = false;
+  document.body.classList.remove('imagem-mestre-aberta');
+
+  if (!veioDoBroadcast && ehMestreGlobal && canalMesa) {
+    canalMesa.send({ type: 'broadcast', event: 'galeria_fechar_imagem', payload: {} });
+  }
+}
+
+function abrirVisualizadorImagem(url, pasta, nome = 'Imagem da campanha') {
   let modal = document.getElementById('modal-visualizador-img');
   if (!modal) {
     modal = document.createElement('div');
     modal.id = 'modal-visualizador-img';
-    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; padding: 15px; box-sizing: border-box;';
+    modal.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; padding: 15px; box-sizing: border-box;';
     modal.innerHTML = `
-      <div style="position: relative; max-width: 95%; max-height: 85vh; text-align: center;">
-        <button onclick="document.getElementById('modal-visualizador-img').style.display='none'" style="position: absolute; top: -35px; right: 0; background: #ff5252; color: #fff; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.85rem;">✕ Fechar</button>
-        <img id="img-ampliada" src="" alt="Zoom" style="max-width: 100%; max-height: 75vh; border-radius: 6px; border: 2px solid #8257e5;">
-        <div id="legenda-ampliada" style="color: #fff; margin-top: 8px; font-weight: bold; font-size: 1rem;"></div>
-      </div>
-    `;
+      <div style="position:relative; max-width:95%; max-height:90vh; text-align:center;">
+        <button type="button" onclick="document.getElementById('modal-visualizador-img').style.display='none'" style="position:absolute; top:-40px; right:0; background:#ff5252; color:#fff; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold;">✕ Fechar</button>
+        <img id="img-ampliada" src="" alt="" style="max-width:100%; max-height:78vh; border-radius:8px; border:2px solid #d4af37; display:block; margin:auto;">
+        <div id="legenda-ampliada" style="color:#fff; margin-top:10px; font-weight:bold; font-size:1rem;"></div>
+      </div>`;
     document.body.appendChild(modal);
   }
-
   const imgAmpliada = document.getElementById('img-ampliada');
   const legendaAmpliada = document.getElementById('legenda-ampliada');
-  if (imgAmpliada) imgAmpliada.src = url;
-  if (legendaAmpliada) legendaAmpliada.innerText = `Categoria: ${categoria}`;
+  if (imgAmpliada) { imgAmpliada.src = url; imgAmpliada.alt = nome; }
+  if (legendaAmpliada) legendaAmpliada.textContent = `${nome} · 📁 ${pasta}`;
   modal.style.display = 'flex';
 }
 
@@ -1549,6 +1766,11 @@ window.confirmarCriacaoToken = confirmarCriacaoToken;
 window.rolarDado = rolarDado;
 window.rolarExpressaoPersonalizada = rolarExpressaoPersonalizada;
 window.fazerUploadImagem = fazerUploadImagem;
+window.carregarGaleria = carregarGaleria;
+window.filtrarGaleriaPasta = filtrarGaleriaPasta;
+window.mostrarImagemParaTodos = mostrarImagemParaTodos;
+window.abrirImagemMestre = abrirImagemMestre;
+window.fecharImagemMestre = fecharImagemMestre;
 window.alternarMovimentoMapa = alternarMovimentoMapa;
 window.alternarModoImersivoMapa = alternarModoImersivoMapa;
 window.tocarSom = tocarSom;

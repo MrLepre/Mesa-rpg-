@@ -824,3 +824,215 @@ body::before,
     transition: none !important;
   }
 }
+
+
+/* ==========================================================
+   POLIMENTO GLOBAL v1 — DESEMPENHO + LEGIBILIDADE + QOL
+   ========================================================== */
+
+/* Evita trabalho de layout desnecessário em blocos independentes. */
+.card-secao,
+#container-ficha-carregada,
+#lista-fichas-grupo,
+#historico-rolagens,
+#galeria-grid {
+  contain: layout style;
+}
+
+/* Galerias longas não precisam renderizar tudo de uma vez. */
+#galeria-grid > div,
+#historico-rolagens > div {
+  content-visibility: auto;
+  contain-intrinsic-size: 150px;
+}
+
+/* Área do mapa continua com o comportamento atual, mas evita repaints
+   desnecessários no restante da página. */
+.vtt-wrapper {
+  contain: layout paint;
+}
+
+/* Hierarquia visual mais clara nas áreas de conteúdo. */
+.card-secao {
+  background: linear-gradient(145deg, rgba(19,24,37,.98), rgba(10,14,23,.98));
+  border-color: rgba(197,160,89,.32);
+}
+
+.card-secao h3 {
+  line-height: 1.25;
+}
+
+.card-secao p {
+  line-height: 1.55;
+}
+
+/* Botões ficam mais previsíveis: animação apenas quando existe interação. */
+@media (hover: hover) and (pointer: fine) {
+  button:hover {
+    transform: translateY(-1px);
+  }
+}
+
+/* Em touch não usamos hover persistente nem efeitos caros. */
+@media (pointer: coarse) {
+  button:hover {
+    transform: none;
+    box-shadow: 0 4px 10px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.1);
+  }
+
+  .card-secao:hover {
+    border-color: rgba(197,160,89,.32);
+  }
+}
+
+/* Navegação mais confortável e estável em telas pequenas. */
+@media (max-width: 768px) {
+  main {
+    padding-bottom: 5rem;
+  }
+
+  .topo-mesa h1 {
+    letter-spacing: .045em;
+  }
+
+  .abas-navegacao {
+    overscroll-behavior-x: contain;
+  }
+
+  .abas-navegacao button {
+    flex: 0 0 auto;
+  }
+}
+
+/* Reduz consumo visual quando o usuário prefere menos movimento. */
+@media (prefers-reduced-motion: reduce) {
+  .painel.ativo {
+    animation: none !important;
+  }
+}
+
+/* ==========================================================
+   GALERIA v2 — BIBLIOTECA DE CAMPANHA + MOSTRAR PARA TODOS
+   ========================================================== */
+.cabecalho-galeria {
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:18px;
+  margin-bottom:16px;
+}
+.eyebrow-galeria,.rotulo-pastas,.imagem-mestre-kicker {
+  display:block;
+  font-family:'Cinzel',serif;
+  font-size:.72rem;
+  letter-spacing:.12em;
+  color:var(--cam-gold);
+  font-weight:700;
+  text-transform:uppercase;
+}
+.subtexto-galeria { margin-top:5px; color:#a8a8b3; }
+.status-galeria {
+  padding:7px 11px;
+  border:1px solid var(--cam-border);
+  border-radius:999px;
+  background:rgba(16,20,31,.8);
+  color:#bfc4d1;
+  white-space:nowrap;
+  font-size:.82rem;
+}
+.card-galeria-mestre {
+  margin-bottom:16px;
+  padding:16px;
+  border:1px solid rgba(212,175,55,.45);
+  border-radius:8px;
+  background:linear-gradient(145deg,rgba(28,28,31,.98),rgba(14,17,25,.98));
+  box-shadow:0 8px 25px rgba(0,0,0,.2);
+}
+.titulo-painel-galeria { margin-bottom:13px; }
+.titulo-painel-galeria strong { color:var(--cam-gold-light); font-family:'Cinzel',serif; }
+.titulo-painel-galeria small { display:block; color:#a8a8b3; margin-top:3px; }
+.form-galeria-mestre {
+  display:grid;
+  grid-template-columns:minmax(150px,1.2fr) minmax(140px,1fr) minmax(120px,.8fr) minmax(190px,1.2fr) auto;
+  gap:10px;
+  align-items:end;
+}
+.campo-galeria { display:flex; flex-direction:column; gap:5px; }
+.campo-galeria span { color:#c9c1af; font-size:.8rem; font-family:'Cinzel',serif; }
+.campo-galeria input,.campo-galeria select {
+  width:100%; min-height:40px; padding:8px 10px; border-radius:5px;
+  background:#0d1018; color:#eee; border:1px solid #3a3427;
+}
+.campo-galeria input:focus,.campo-galeria select:focus { border-color:var(--cam-gold); outline:none; box-shadow:0 0 0 2px rgba(212,175,55,.12); }
+.btn-publicar-galeria { min-height:40px; white-space:nowrap; }
+.btn-publicar-galeria:disabled { opacity:.6; cursor:wait; }
+.barra-pastas-galeria {
+  display:flex; justify-content:space-between; align-items:flex-end; gap:12px;
+  margin:10px 0 12px; padding-bottom:9px; border-bottom:1px solid rgba(74,61,36,.7);
+}
+.galeria-pastas { display:flex; gap:7px; flex-wrap:wrap; margin-top:6px; }
+.pasta-galeria {
+  border:1px solid #3a3427; background:#10141f; color:#c9c1af;
+  padding:6px 10px; border-radius:999px; font-family:'EB Garamond',serif; font-size:.88rem;
+}
+.pasta-galeria:hover,.pasta-galeria.ativa { border-color:var(--cam-gold); color:var(--cam-gold-light); background:#18213a; }
+.btn-atualizar-galeria { padding:6px 11px; white-space:nowrap; }
+.galeria-grid-profissional {
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:12px;
+}
+.card-imagem-galeria {
+  min-width:0; overflow:hidden; border:1px solid #302b22; border-radius:8px;
+  background:#0e121b; transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;
+}
+.card-imagem-galeria:hover { transform:translateY(-2px); border-color:var(--cam-gold); box-shadow:0 10px 24px rgba(0,0,0,.3); }
+.card-imagem-galeria.imagem-oculta { border-color:#493f2b; }
+.thumb-galeria { height:145px; background:#07090f; position:relative; overflow:hidden; }
+.thumb-galeria img { width:100%; height:100%; object-fit:cover; display:block; }
+.info-imagem-galeria { padding:9px 10px 5px; }
+.info-imagem-galeria strong { display:block; color:#eee; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.info-imagem-galeria span { display:block; margin-top:3px; color:#8f95a3; font-size:.76rem; }
+.acoes-imagem-galeria { display:flex; gap:6px; padding:7px 9px 9px; }
+.btn-mini-galeria { flex:1; padding:6px 7px; font-family:'EB Garamond',serif; font-size:.8rem; border-width:1px; }
+.btn-mostrar-galeria { border-color:#9b7a22; color:#f3d075; }
+.estado-galeria { grid-column:1/-1; padding:30px 15px; text-align:center; color:#8f95a3; border:1px dashed #3a3427; border-radius:8px; }
+
+.modal-imagem-mestre {
+  position:fixed; inset:0; z-index:10050; display:flex; align-items:center; justify-content:center;
+  padding:20px; isolation:isolate;
+}
+.imagem-mestre-backdrop { position:absolute; inset:0; background:rgba(2,4,8,.91); backdrop-filter:blur(4px); }
+.imagem-mestre-conteudo {
+  position:relative; z-index:1; width:min(1100px,96vw); max-height:94vh;
+  border:1px solid var(--cam-gold); border-radius:10px; overflow:hidden;
+  background:linear-gradient(145deg,#10141f,#080b12); box-shadow:0 25px 80px rgba(0,0,0,.75);
+  animation:imagemMestreEntrada .22s ease-out;
+}
+@keyframes imagemMestreEntrada { from{opacity:0;transform:scale(.97)} to{opacity:1;transform:scale(1)} }
+.imagem-mestre-cabecalho { display:flex; justify-content:space-between; gap:15px; align-items:flex-start; padding:13px 16px; border-bottom:1px solid rgba(212,175,55,.35); }
+.imagem-mestre-cabecalho h2 { margin:2px 0 2px; font-size:1.15rem; }
+.imagem-mestre-pasta { color:#9ca3af; font-size:.8rem; }
+.btn-fechar-imagem-mestre { border-color:#704044; background:#2b1518; color:#ffb5b5; padding:7px 10px; }
+.imagem-mestre-palco { display:flex; justify-content:center; align-items:center; padding:16px; max-height:calc(94vh - 92px); overflow:auto; }
+.imagem-mestre-palco img { display:block; max-width:100%; max-height:calc(94vh - 130px); width:auto; height:auto; object-fit:contain; border-radius:5px; }
+body.imagem-mestre-aberta { overflow:hidden !important; }
+
+@media (max-width:900px) {
+  .form-galeria-mestre { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .btn-publicar-galeria { width:100%; }
+}
+@media (max-width:600px) {
+  .cabecalho-galeria { align-items:flex-start; flex-direction:column; }
+  .form-galeria-mestre { grid-template-columns:1fr; }
+  .barra-pastas-galeria { align-items:stretch; flex-direction:column; }
+  .galeria-pastas { flex-wrap:nowrap; overflow-x:auto; padding-bottom:3px; }
+  .pasta-galeria { flex:0 0 auto; }
+  .galeria-grid-profissional { grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+  .thumb-galeria { height:120px; }
+  .acoes-imagem-galeria { flex-direction:column; }
+  .imagem-mestre-conteudo { width:100%; }
+  .imagem-mestre-palco { padding:8px; }
+  .imagem-mestre-palco img { max-height:calc(94vh - 110px); }
+}
+@media (prefers-reduced-motion:reduce) {
+  .card-imagem-galeria,.imagem-mestre-conteudo { transition:none; animation:none; }
+}

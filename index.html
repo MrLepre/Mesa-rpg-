@@ -41,6 +41,34 @@
     </nav>
   </div>
 
+  <!-- Central de Ações Rápidas -->
+  <div id="acoes-rapidas" class="acoes-rapidas" aria-label="Ações rápidas">
+    <button type="button" id="btn-acoes-rapidas" class="btn-acoes-rapidas" aria-expanded="false" aria-controls="menu-acoes-rapidas" aria-label="Abrir ações rápidas" onclick="alternarAcoesRapidas(event)">
+      <span class="acoes-rapidas-icone">＋</span>
+    </button>
+
+    <div id="menu-acoes-rapidas" class="menu-acoes-rapidas" aria-hidden="true">
+      <button type="button" class="acao-rapida acao-rolagem" onclick="acaoRapida('rolagem')">
+        <span class="acao-icone">🎲</span><span><strong>Rolar</strong><small>Dados e expressões</small></span>
+      </button>
+      <button type="button" class="acao-rapida acao-ataque" onclick="acaoRapida('ataque')">
+        <span class="acao-icone">⚔️</span><span><strong>Ação / Ataque</strong><small>Rolar uma ação rápida</small></span>
+      </button>
+      <button type="button" class="acao-rapida acao-vida" onclick="acaoRapida('vida')">
+        <span class="acao-icone">❤️</span><span><strong>Alterar Vida</strong><small>Último token tocado</small></span>
+      </button>
+      <button type="button" class="acao-rapida acao-chat" onclick="acaoRapida('chat')">
+        <span class="acao-icone">💬</span><span><strong>Chat & Galeria</strong><small>Ir para comunicação</small></span>
+      </button>
+      <button type="button" class="acao-rapida acao-nota" onclick="acaoRapida('nota')">
+        <span class="acao-icone">📝</span><span><strong>Nota rápida</strong><small>Salvar uma anotação</small></span>
+      </button>
+      <button type="button" class="acao-rapida acao-mapa" onclick="acaoRapida('mapa')">
+        <span class="acao-icone">🗺️</span><span><strong>Ir para o Mapa</strong><small>Abrir a mesa tática</small></span>
+      </button>
+    </div>
+  </div>
+
   <main>
     <section id="aba-ficha" class="painel ativo">
       <h2>Minha Ficha do Personagem</h2>

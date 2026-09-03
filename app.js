@@ -20,6 +20,7 @@ let vttPanY = 0;
 let vttMovimentoLivre = false;
 let mapaModoImersivo = false;
 let audioContext = null;
+let ultimoTokenInteragido = null;
 
 // --- FEEDBACK SONORO E TÁTIL (sem arquivos externos) ---
 function tocarSom(tipo = 'click') {
@@ -157,6 +158,7 @@ document.addEventListener('keydown', (event) => {
   const tag = document.activeElement?.tagName;
   const digit = event.key;
   if (digit === 'Escape') {
+    fecharAcoesRapidas();
     fecharCriadorFicha();
     if (typeof fecharModalFichaGrupo === 'function') fecharModalFichaGrupo();
     const visualizador = document.getElementById('modal-visualizador-img');
@@ -285,6 +287,136 @@ function atualizarInterfaceAuth(user) {
     if (painelUploadMestre) painelUploadMestre.style.display = 'none';
   }
 }
+
+// --- CENTRAL DE AÇÕES RÁPIDAS ---
+function alternarAcoesRapidas(event) {
+  if (event) event.stopPropagation();
+  const container = document.getElementById('acoes-rapidas');
+  const botao = document.getElementById('btn-acoes-rapidas');
+  const menu = document.getElementById('menu-acoes-rapidas');
+  if (!container || !botao || !menu) return;
+
+  const aberto = container.classList.toggle('aberto');
+  botao.setAttribute('aria-expanded', String(aberto));
+  botao.setAttribute('aria-label', aberto ? 'Fechar ações rápidas' : 'Abrir ações rápidas');
+  menu.setAttribute('aria-hidden', String(!aberto));
+  tocarSom(aberto ? 'success' : 'click');
+  vibrarPadrao([aberto ? 14 : 8]);
+}
+
+function fecharAcoesRapidas() {
+  const container = document.getElementById('acoes-rapidas');
+  const botao = document.getElementById('btn-acoes-rapidas');
+  const menu = document.getElementById('menu-acoes-rapidas');
+  if (!container || !botao || !menu) return;
+  container.classList.remove('aberto');
+  botao.setAttribute('aria-expanded', 'false');
+  botao.setAttribute('aria-label', 'Abrir ações rápidas');
+  menu.setAttribute('aria-hidden', 'true');
+}
+
+function focarElementoDepoisDoAba(id) {
+  window.setTimeout(() => {
+    const elemento = document.getElementById(id);
+    if (!elemento) return;
+    elemento.focus({ preventScroll: true });
+    elemento.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 80);
+}
+
+function acaoRapida(tipo) {
+  fecharAcoesRapidas();
+
+  if (tipo === 'rolagem') {
+    mudarAba('rolagens');
+    focarElementoDepoisDoAba('expressao-dado');
+    mostrarPopup('🎲 Salão de Rolagens aberto.');
+    return;
+  }
+
+  if (tipo === 'ataque') {
+    const expressao = prompt('⚔️ Ação / Ataque\n\nDigite a rolagem (ex: 1d20+5):', '1d20+0');
+    if (expressao === null) return;
+    const input = document.getElementById('expressao-dado');
+    if (!input) return mostrarPopup('❌ Campo de rolagem não encontrado.');
+    mudarAba('rolagens');
+    input.value = expressao.trim();
+    rolarExpressaoPersonalizada();
+    return;
+  }
+
+  if (tipo === 'vida') {
+    if (!ultimoTokenInteragido || !document.body.contains(ultimoTokenInteragido)) {
+      mudarAba('mapa');
+      mostrarPopup('❤️ Primeiro toque/clique em um token no mapa para selecioná-lo.');
+      return;
+    }
+
+    const token = ultimoTokenInteragido;
+    const nome = token.dataset.tokenNome || 'Personagem';
+    const hpAtual = Number(token.dataset.tokenHpAtual) || 0;
+    const hpMax = Number(token.dataset.tokenHpMax) || 50;
+    const novoHpStr = prompt(`Gerenciar Vida de ${nome} (${hpAtual}/${hpMax}):\nDigite o novo valor ou ajuste com + / - (ex: -5, +5):`, hpAtual);
+    if (novoHpStr === null) return;
+
+    const valorTrim = novoHpStr.trim();
+    let calculado = hpAtual;
+    if (valorTrim.startsWith('+') || valorTrim.startsWith('-')) {
+      calculado = Math.max(0, Math.min(hpMax, hpAtual + (parseInt(valorTrim, 10) || 0)));
+    } else {
+      calculado = Math.max(0, Math.min(hpMax, parseInt(valorTrim, 10) || 0));
+    }
+
+    token.dataset.tokenHpAtual = String(calculado);
+    const hpTag = token.querySelector('.vtt-token-hp');
+    if (hpTag) {
+      hpTag.innerText = `${calculado}/${hpMax}`;
+      hpTag.style.color = calculado <= (hpMax * 0.25) ? '#ff5252' : (calculado <= (hpMax * 0.5) ? '#ffab40' : '#04d361');
+    }
+
+    const x = parseFloat(token.style.left) || 0;
+    const y = parseFloat(token.style.top) || 0;
+    transmitirMovimentoToken(token, x, y);
+    mostrarPopup(`❤️ Vida de ${nome}: ${calculado}/${hpMax}`);
+    tocarSom('success');
+    return;
+  }
+
+  if (tipo === 'chat') {
+    mudarAba('galeria');
+    mostrarPopup('💬 Chat & Galeria aberto.');
+    return;
+  }
+
+  if (tipo === 'nota') {
+    const texto = prompt('📝 Nota rápida\n\nDigite sua anotação:');
+    if (texto === null || !texto.trim()) return;
+    let notas = [];
+    try {
+      notas = JSON.parse(localStorage.getItem('cronicas_camelot_notas') || '[]');
+      if (!Array.isArray(notas)) notas = [];
+    } catch (err) {
+      notas = [];
+    }
+    notas.unshift({ texto: texto.trim(), data: new Date().toISOString() });
+    localStorage.setItem('cronicas_camelot_notas', JSON.stringify(notas.slice(0, 100)));
+    mostrarPopup('📝 Nota salva neste dispositivo.');
+    tocarSom('success');
+    return;
+  }
+
+  if (tipo === 'mapa') {
+    mudarAba('mapa');
+    mostrarPopup('🗺️ Mapa aberto.');
+  }
+}
+
+document.addEventListener('pointerdown', (event) => {
+  const container = document.getElementById('acoes-rapidas');
+  if (container && container.classList.contains('aberto') && !container.contains(event.target)) {
+    fecharAcoesRapidas();
+  }
+});
 
 // --- NAVEGAÇÃO DE ABAS ---
 function mudarAba(nomeAba, evento) {
@@ -1038,6 +1170,8 @@ function ativarArrastoToken(token) {
     // Apenas botão esquerdo no mouse.
     if (e.pointerType === 'mouse' && e.button !== 0) return;
 
+    ultimoTokenInteragido = token;
+
     arrastando = true;
     moveuDeFato = false;
     ponteiroAtivo = e.pointerId;
@@ -1387,6 +1521,8 @@ function mostrarPopup(texto) {
 // ==========================================
 // EXPORTAÇÕES GLOBAIS
 // ==========================================
+window.alternarAcoesRapidas = alternarAcoesRapidas;
+window.acaoRapida = acaoRapida;
 window.fazerLogin = fazerLogin;
 window.fazerCadastro = fazerCadastro;
 window.fazerLogout = fazerLogout;

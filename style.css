@@ -391,10 +391,17 @@ body::before {
   mix-blend-mode: screen;
 }
 
-.topo-mesa {
+/* Cabeçalho + navegação permanecem juntos quando a página rola.
+   Isso evita que a barra de abas cubra o título do conteúdo. */
+#topo-geral {
   position: sticky;
   top: 0;
   z-index: 1000;
+}
+
+.topo-mesa {
+  position: relative;
+  z-index: 2;
   background: linear-gradient(180deg, rgba(16,20,31,.98), rgba(10,13,21,.97));
   box-shadow: 0 8px 24px rgba(0,0,0,.32);
 }
@@ -405,9 +412,9 @@ body::before {
 .topo-mesa h1::before { content: "⚔ "; color: var(--cam-gold); }
 
 .abas-navegacao {
-  position: sticky;
-  top: 77px;
-  z-index: 999;
+  position: relative;
+  top: auto;
+  z-index: 1;
   scrollbar-width: none;
   background: rgba(12,16,26,.96);
   backdrop-filter: blur(10px);
@@ -505,7 +512,7 @@ input[type="file"]::file-selector-button {
   .form-login input:first-child { grid-column: 1 / -1; }
   .form-login button { width:100%; }
   #status-usuario { width:100%; justify-content:space-between; flex-wrap:wrap; }
-  .abas-navegacao { top:0; padding:6px; }
+  .abas-navegacao { top:auto; padding:6px; }
   main { padding: .75rem; }
   .card-secao { padding: .9rem; }
   .status-conexao { left:50%; transform:translateX(-50%); bottom:8px; }

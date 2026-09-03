@@ -6,7 +6,8 @@ const SUPABASE_URL = 'https://rolrbrtpqbchyxmjmvzr.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_mJmJfELKk4O1HCTzoKxDdw_EWaiv4j1';
 
 let supabaseClient = null;
-let dadosFichaAtual = null; 
+let dadosFichaAtual = null;
+let fichaEditandoUserId = null;
 let canalMesa = null;
 let gridAtivo = false;
 let vttZoom = 100;
@@ -93,6 +94,9 @@ window.addEventListener('message', async (event) => {
 
   const foiEdicao = event.data.modo === 'edicao';
   dadosFichaAtual = event.data.dados;
+  if (foiEdicao && event.data.userId) {
+    fichaEditandoUserId = event.data.userId;
+  }
   renderizarFichaNaTela(dadosFichaAtual);
   fecharCriadorFicha();
 
@@ -101,7 +105,7 @@ window.addEventListener('message', async (event) => {
 
   if (supabaseClient) {
     const { data: { session } } = await supabaseClient.auth.getSession();
-    if (session) await salvarFichaNoSupabase();
+    if (session) await salvarFichaNoSupabase(fichaEditandoUserId);
   }
 });
 
@@ -245,27 +249,42 @@ function importarArquivoJSON(event) {
   reader.readAsText(file);
 }
 
-async function salvarFichaNoSupabase() {
+async function salvarFichaNoSupabase(userIdDestino = null) {
   if (!supabaseClient) return alert('Supabase não conectado.');
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (!session) return alert('Você precisa estar logado para salvar sua ficha!');
   if (!dadosFichaAtual) return alert('Importe um arquivo JSON de ficha primeiro!');
 
   const nomeChar = dadosFichaAtual.nome || dadosFichaAtual.personagem_nome || 'Personagem';
+  const ehEdicaoMestre = Boolean(ehMestreGlobal && userIdDestino && userIdDestino !== session.user.id);
+  const idDestino = userIdDestino || session.user.id;
 
-  const { error } = await supabaseClient
-    .from('fichas')
-    .upsert({
-      user_id: session.user.id,
-      nome_personagem: nomeChar,
-      dados_ficha: dadosFichaAtual,
-      updated_at: new Date()
-    }, { onConflict: 'user_id' });
+  let resultado;
 
-  if (error) {
-    mostrarPopup('❌ Erro ao salvar: ' + error.message);
+  if (ehEdicaoMestre) {
+    resultado = await supabaseClient
+      .from('fichas')
+      .update({
+        nome_personagem: nomeChar,
+        dados_ficha: dadosFichaAtual,
+        updated_at: new Date()
+      })
+      .eq('user_id', idDestino);
   } else {
-    mostrarPopup('💾 Ficha salva na nuvem com sucesso!');
+    resultado = await supabaseClient
+      .from('fichas')
+      .upsert({
+        user_id: session.user.id,
+        nome_personagem: nomeChar,
+        dados_ficha: dadosFichaAtual,
+        updated_at: new Date()
+      }, { onConflict: 'user_id' });
+  }
+
+  if (resultado.error) {
+    mostrarPopup('❌ Erro ao salvar: ' + resultado.error.message);
+  } else {
+    mostrarPopup(ehEdicaoMestre ? '👑 Ficha do jogador atualizada pelo Mestre!' : '💾 Ficha salva na nuvem com sucesso!');
   }
 }
 
@@ -330,20 +349,27 @@ function abrirEditorFichaAtual() {
   modal.style.display = 'flex';
   iframe.addEventListener('load', function carregarEdicaoUmaVez() {
     iframe.removeEventListener('load', carregarEdicaoUmaVez);
-    iframe.contentWindow.postMessage({ type: 'cronicas-camelot-carregar-ficha', dados: dadosFichaAtual, modo: 'edicao' }, window.location.origin);
+    iframe.contentWindow.postMessage({ type: 'cronicas-camelot-carregar-ficha', dados: dadosFichaAtual, modo: 'edicao', userId: null }, window.location.origin);
   });
 }
 
-function abrirEditorFicha(dados) {
+function abrirEditorFicha(dados, userId = null) {
   if (!dados) return mostrarPopup('❌ Dados da ficha não encontrados.');
   const modal = document.getElementById('modal-criador-ficha');
   const iframe = document.getElementById('iframe-criador-ficha');
   if (!modal || !iframe) return;
+
+  fichaEditandoUserId = userId;
   iframe.src = 'ficha-editor.html?modo=edicao&t=' + Date.now();
   modal.style.display = 'flex';
   iframe.addEventListener('load', function carregarEdicaoUmaVez() {
     iframe.removeEventListener('load', carregarEdicaoUmaVez);
-    iframe.contentWindow.postMessage({ type: 'cronicas-camelot-carregar-ficha', dados: dados, modo: 'edicao' }, window.location.origin);
+    iframe.contentWindow.postMessage({
+      type: 'cronicas-camelot-carregar-ficha',
+      dados: dados,
+      modo: 'edicao',
+      userId: userId
+    }, window.location.origin);
   });
 }
 
@@ -414,12 +440,12 @@ async function carregarFichasDoGrupo() {
     };
     acoesDiv.appendChild(botaoVer);
 
-    if (meuUserId && item.user_id === meuUserId) {
+    if ((meuUserId && item.user_id === meuUserId) || ehMestreGlobal) {
       const botaoEditar = document.createElement('button');
-      botaoEditar.innerText = '✏️ Editar';
+      botaoEditar.innerText = ehMestreGlobal && item.user_id !== meuUserId ? '👑 Editar como Mestre' : '✏️ Editar';
       botaoEditar.style.cssText = 'background: #315d36; color: #dfffe3; border: 1px solid #7fd88b; padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font-weight: bold;';
       botaoEditar.onclick = () => {
-        abrirEditorFicha(item.dados_ficha);
+        abrirEditorFicha(item.dados_ficha, item.user_id);
       };
       acoesDiv.appendChild(botaoEditar);
     }

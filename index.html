@@ -45,7 +45,12 @@
         <input type="file" id="arquivo-json" accept=".json" onchange="importarArquivoJSON(event)">
       </div>
       <div class="card-secao" style="margin-top: 15px;">
-        <h3>2. Sincronização em Nuvem</h3>
+        <h3>2. Criar Ficha Diretamente na Mesa</h3>
+        <p>Crie um novo personagem usando a ficha completa de Crônicas de Camelot, sem precisar sair da mesa.</p>
+        <button onclick="abrirCriadorFicha()" class="btn-ficha-principal">⚔️ Criar Nova Ficha na Mesa</button>
+      </div>
+      <div class="card-secao" style="margin-top: 15px;">
+        <h3>3. Sincronização em Nuvem</h3>
         <button onclick="salvarFichaNoSupabase()" style="background: #04d361; color: #121214; font-weight: bold; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer;">Salvar/Atualizar Ficha na Nuvem</button>
       </div>
       <div id="container-ficha-carregada" style="margin-top: 20px;">
@@ -138,12 +143,23 @@
   </main>
 
   <div id="modal-ficha-grupo" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 9998; justify-content: center; align-items: center; padding: 20px;">
-    <div style="background: #121214; width: 100%; max-width: 700px; border-radius: 6px; border: 2px solid #c5a059; overflow: hidden; display: flex; flex-direction: column;">
+    <div class="modal-ficha-grupo-conteudo">
       <div style="background: #1a1d26; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #c5a059;">
         <h2 id="modal-titulo-personagem" style="color: #f3d075; font-size: 1.2rem; margin: 0;">Ficha do Cavaleiro</h2>
         <button onclick="fecharModalFichaGrupo()" style="background: #ff5252; color: #fff; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-weight: bold;">✕ Fechar</button>
       </div>
-      <div id="modal-conteudo-ficha" style="padding: 20px; overflow-y: auto; max-height: 80vh;"></div>
+      <div id="modal-conteudo-ficha" class="modal-ficha-grupo-body"></div>
+    </div>
+  </div>
+
+  <!-- Editor completo da ficha dentro da Mesa -->
+  <div id="modal-criador-ficha" class="modal-ficha-completa" style="display:none;">
+    <div class="modal-ficha-completa-conteudo">
+      <div class="modal-ficha-cabecalho">
+        <h2>⚔️ Criar Nova Ficha — Crônicas de Camelot</h2>
+        <button onclick="fecharCriadorFicha()" class="btn-fechar-modal">✕ Fechar</button>
+      </div>
+      <iframe id="iframe-criador-ficha" title="Criador de Ficha Crônicas de Camelot" src="about:blank"></iframe>
     </div>
   </div>
 

@@ -34,11 +34,18 @@
 
     <nav class="abas-navegacao">
       <button class="ativo" onclick="mudarAba('ficha', event)">Minha Ficha</button>
+      <button onclick="mudarAba('campanhas', event)">Campanhas</button>
       <button onclick="mudarAba('grupo', event)">Fichas do Grupo</button>
       <button onclick="mudarAba('mapa', event)">Mapa</button>
       <button onclick="mudarAba('rolagens', event)">Rolagens</button>
       <button onclick="mudarAba('galeria', event)">Chat & Galeria</button>
     </nav>
+
+    <div id="contexto-campanha" class="contexto-campanha" style="display:none;">
+      <span class="contexto-campanha-rotulo">🏰 Campanha ativa</span>
+      <strong id="campanha-ativa-nome">Carregando...</strong>
+      <span class="contexto-campanha-sistema" id="campanha-ativa-sistema">Sistema: —</span>
+    </div>
   </div>
 
   <!-- Central de Ações Rápidas -->
@@ -70,6 +77,32 @@
   </div>
 
   <main>
+    <section id="aba-campanhas" class="painel">
+      <div class="cabecalho-campanhas">
+        <div>
+          <span class="eyebrow-galeria">🏰 Távola de Campanhas</span>
+          <h2>Campanhas</h2>
+          <p class="subtexto-galeria">Cada campanha possui seus próprios personagens, mapas, imagens e recursos. Nada é misturado entre mesas.</p>
+        </div>
+        <button id="btn-nova-campanha" class="btn-nova-campanha" style="display:none;" onclick="abrirNovaCampanha()">＋ Nova Campanha</button>
+      </div>
+
+      <div id="painel-nova-campanha" class="card-secao card-nova-campanha" style="display:none;">
+        <h3>👑 Criar nova campanha</h3>
+        <p>Escolha um nome para a nova mesa. Ela será criada separada da campanha atual.</p>
+        <div class="form-nova-campanha">
+          <input id="nova-campanha-nome" type="text" maxlength="80" placeholder="Ex.: A Queda de Avalon">
+          <input id="nova-campanha-descricao" type="text" maxlength="180" placeholder="Descrição curta (opcional)">
+          <button onclick="criarNovaCampanha()" class="btn-ficha-principal">⚔️ Criar Campanha</button>
+          <button onclick="fecharNovaCampanha()" class="btn-secundario">Cancelar</button>
+        </div>
+      </div>
+
+      <div id="lista-campanhas" class="lista-campanhas">
+        <div class="estado-galeria">Faça login para carregar suas campanhas.</div>
+      </div>
+    </section>
+
     <section id="aba-ficha" class="painel ativo">
       <h2>Minha Ficha do Personagem</h2>
       <div class="card-secao">

@@ -26,6 +26,9 @@ let abaAtual = 'ficha';
 let pastaGaleriaAtual = 'Todas';
 let dadosGaleriaAtual = [];
 let imagemMestreAberta = false;
+let campanhaAtual = null;
+let sistemaAtual = null;
+let campanhasDisponiveis = [];
 
 // --- FEEDBACK SONORO E TÁTIL (sem arquivos externos) ---
 function tocarSom(tipo = 'click') {
@@ -110,6 +113,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       atualizarInterfaceAuth(session?.user || null);
 
       if (session?.user) {
+        await carregarCampanhasDoUsuario(session.user.id);
         carregarFichaDoUsuario(session.user.id);
       }
 
@@ -127,29 +131,36 @@ document.addEventListener('DOMContentLoaded', async () => {
       canalMesa = supabaseClient.channel('sala-rpg-geral');
       canalMesa
         .on('broadcast', { event: 'novo_mapa' }, (payload) => {
+          if (payload.payload.campanha_id && payload.payload.campanha_id !== obterCampanhaIdAtual()) return;
           exibirMapaNaTela(payload.payload.url);
           mostrarPopup('🗺️ O Mestre atualizou o Mapa de Batalha!');
         })
         .on('broadcast', { event: 'vtt_zoom' }, (payload) => {
+          if (payload.payload.campanha_id && payload.payload.campanha_id !== obterCampanhaIdAtual()) return;
           vttZoom = payload.payload.zoom;
           vttPanX = payload.payload.panX || 0;
           vttPanY = payload.payload.panY || 0;
           atualizarTransformMapaVTT();
         })
         .on('broadcast', { event: 'nova_rolagem' }, (payload) => {
+          if (payload.payload.campanha_id && payload.payload.campanha_id !== obterCampanhaIdAtual()) return;
           registrarRolagemHistorico(payload.payload.descricao, payload.payload.resultado, true);
         })
         .on('broadcast', { event: 'galeria_mostrar_imagem' }, (payload) => {
           const dados = payload.payload || {};
+          if (dados.campanha_id && dados.campanha_id !== obterCampanhaIdAtual()) return;
           if (dados.url) abrirImagemMestre(dados.url, dados.nome || 'Imagem da campanha', dados.pasta || 'Geral', true);
         })
-        .on('broadcast', { event: 'galeria_fechar_imagem' }, () => {
+        .on('broadcast', { event: 'galeria_fechar_imagem' }, (payload) => {
+          if (payload.payload?.campanha_id && payload.payload.campanha_id !== obterCampanhaIdAtual()) return;
           fecharImagemMestre(true);
         })
         .on('broadcast', { event: 'vtt_ping' }, (payload) => {
+          if (payload.payload.campanha_id && payload.payload.campanha_id !== obterCampanhaIdAtual()) return;
           criarEfeitoPing(payload.payload.x, payload.payload.y);
         })
         .on('broadcast', { event: 'vtt_mover_token' }, (payload) => {
+          if (payload.payload.campanha_id && payload.payload.campanha_id !== obterCampanhaIdAtual()) return;
           criarElementoToken(
             payload.payload.id, 
             payload.payload.nome, 
@@ -269,6 +280,7 @@ async function fazerLogin() {
   } else {
     mostrarPopup('✅ Login realizado!');
     atualizarInterfaceAuth(authResult.data.user);
+    await carregarCampanhasDoUsuario(authResult.data.user.id);
     carregarFichaDoUsuario(authResult.data.user.id);
   }
 }
@@ -278,6 +290,11 @@ async function fazerLogout() {
   await supabaseClient.auth.signOut();
   atualizarInterfaceAuth(null);
   dadosFichaAtual = null;
+  campanhaAtual = null;
+  sistemaAtual = null;
+  campanhasDisponiveis = [];
+  atualizarContextoCampanha();
+  renderizarListaCampanhas();
   const containerFicha = document.getElementById('container-ficha-carregada');
   if (containerFicha) {
     containerFicha.innerHTML = '<p style="color: #a8a8b3;">Faça login para visualizar sua ficha.</p>';
@@ -452,9 +469,175 @@ document.addEventListener('pointerdown', (event) => {
   }
 });
 
+// ==========================================
+// ARQUITETURA MULTICAMPANHA — ETAPA 1
+// ==========================================
+function atualizarContextoCampanha() {
+  const contexto = document.getElementById('contexto-campanha');
+  const nome = document.getElementById('campanha-ativa-nome');
+  const sistema = document.getElementById('campanha-ativa-sistema');
+  if (!contexto || !nome || !sistema) return;
+
+  if (!campanhaAtual) {
+    contexto.style.display = 'none';
+    nome.textContent = 'Nenhuma campanha';
+    sistema.textContent = 'Sistema: —';
+    return;
+  }
+
+  contexto.style.display = 'flex';
+  nome.textContent = campanhaAtual.nome || 'Campanha';
+  sistema.textContent = `Sistema: ${sistemaAtual?.nome || 'Não definido'}`;
+}
+
+function obterCampanhaIdAtual() {
+  return campanhaAtual?.id || null;
+}
+
+function salvarCampanhaLocalmente() {
+  try {
+    if (campanhaAtual?.id) localStorage.setItem('cronicas_camelot_campanha', campanhaAtual.id);
+    else localStorage.removeItem('cronicas_camelot_campanha');
+  } catch (err) {}
+}
+
+async function carregarCampanhasDoUsuario(userId) {
+  if (!supabaseClient || !userId) return;
+  const lista = document.getElementById('lista-campanhas');
+  if (lista) lista.innerHTML = '<div class="estado-galeria">Carregando suas campanhas...</div>';
+
+  const { data, error } = await supabaseClient
+    .from('campanhas')
+    .select('id,nome,descricao,sistema_id,mestre_id,created_at,updated_at,sistemas(id,nome,descricao,configuracao)')
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Erro ao carregar campanhas:', error);
+    if (lista) lista.innerHTML = '<div class="estado-galeria">Não foi possível carregar as campanhas. Execute a migração SQL da Etapa 1 no Supabase.</div>';
+    return;
+  }
+
+  campanhasDisponiveis = data || [];
+  let idSalvo = null;
+  try { idSalvo = localStorage.getItem('cronicas_camelot_campanha'); } catch (err) {}
+
+  const escolhida = campanhasDisponiveis.find(c => c.id === idSalvo) || campanhasDisponiveis[0] || null;
+  if (escolhida) await selecionarCampanha(escolhida.id, false);
+  else {
+    campanhaAtual = null;
+    sistemaAtual = null;
+    atualizarContextoCampanha();
+    renderizarListaCampanhas();
+  }
+
+  const btn = document.getElementById('btn-nova-campanha');
+  if (btn) btn.style.display = ehMestreGlobal ? 'inline-flex' : 'none';
+}
+
+async function selecionarCampanha(campanhaId, mostrarFeedback = true) {
+  const campanha = campanhasDisponiveis.find(c => c.id === campanhaId);
+  if (!campanha) return;
+
+  campanhaAtual = campanha;
+  sistemaAtual = campanha.sistemas || null;
+  salvarCampanhaLocalmente();
+  atualizarContextoCampanha();
+  renderizarListaCampanhas();
+
+  // Limpa estados carregados de recursos da campanha anterior.
+  dadosFichaAtual = null;
+  abasCarregadas = { mapa: false, galeria: false };
+  dadosGaleriaAtual = [];
+  pastaGaleriaAtual = 'Todas';
+
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (session?.user) carregarFichaDoUsuario(session.user.id);
+
+  if (abaAtual === 'mapa') { abasCarregadas.mapa = true; carregarMapaAtual(); }
+  if (abaAtual === 'galeria') { abasCarregadas.galeria = true; carregarGaleria(true); }
+
+  if (mostrarFeedback) mostrarPopup(`🏰 Campanha ativa: ${campanha.nome}`);
+}
+
+function renderizarListaCampanhas() {
+  const lista = document.getElementById('lista-campanhas');
+  if (!lista) return;
+  if (!campanhasDisponiveis.length) {
+    lista.innerHTML = '<div class="estado-galeria">Nenhuma campanha disponível.</div>';
+    return;
+  }
+
+  lista.innerHTML = '';
+  campanhasDisponiveis.forEach(campanha => {
+    const card = document.createElement('article');
+    card.className = 'card-campanha' + (campanhaAtual?.id === campanha.id ? ' ativa' : '');
+    const sistema = campanha.sistemas?.nome || 'Sistema não definido';
+    const mestre = campanha.mestre_id && campanha.mestre_id === campanhaAtual?.mestre_id ? 'Mestre da campanha' : 'Campanha compartilhada';
+    card.innerHTML = `
+      <div class="card-campanha-conteudo">
+        <span class="card-campanha-icone">🏰</span>
+        <div><h3>${escaparHTML(campanha.nome)}</h3>
+        <p>${escaparHTML(campanha.descricao || 'Sem descrição.')}</p>
+        <span class="card-campanha-meta">⚙️ ${escaparHTML(sistema)} · ${escaparHTML(mestre)}</span></div>
+      </div>
+      <button type="button" class="btn-selecionar-campanha" onclick="selecionarCampanha('${campanha.id}')">${campanhaAtual?.id === campanha.id ? '✓ Campanha ativa' : 'Entrar nesta campanha'}</button>`;
+    lista.appendChild(card);
+  });
+}
+
+function abrirNovaCampanha() {
+  if (!ehMestreGlobal) return;
+  const painel = document.getElementById('painel-nova-campanha');
+  if (painel) painel.style.display = 'block';
+  document.getElementById('nova-campanha-nome')?.focus();
+}
+
+function fecharNovaCampanha() {
+  const painel = document.getElementById('painel-nova-campanha');
+  if (painel) painel.style.display = 'none';
+}
+
+async function criarNovaCampanha() {
+  if (!supabaseClient || !ehMestreGlobal) return;
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (!session?.user) return mostrarPopup('❌ Faça login como Mestre para criar uma campanha.');
+
+  const nomeInput = document.getElementById('nova-campanha-nome');
+  const descricaoInput = document.getElementById('nova-campanha-descricao');
+  const nome = nomeInput?.value.trim();
+  const descricao = descricaoInput?.value.trim() || '';
+  if (!nome) return mostrarPopup('❌ Informe o nome da campanha.');
+
+  // Nesta primeira etapa, novas campanhas usam o sistema Camelot legado.
+  // Na Etapa 2, este campo será substituído pelo seletor/construtor de sistemas.
+  let sistemaId = sistemaAtual?.id || campanhasDisponiveis.find(c => c.sistemas?.nome === 'Crônicas de Camelot')?.sistema_id || null;
+  if (!sistemaId) {
+    const { data: sistema } = await supabaseClient.from('sistemas').select('id').ilike('nome', 'Crônicas de Camelot').limit(1).maybeSingle();
+    sistemaId = sistema?.id || null;
+  }
+
+  const { data, error } = await supabaseClient
+    .from('campanhas')
+    .insert({ nome, descricao, sistema_id: sistemaId, mestre_id: session.user.id })
+    .select('id,nome,descricao,sistema_id,mestre_id,created_at,updated_at,sistemas(id,nome,descricao,configuracao)')
+    .single();
+
+  if (error) return mostrarPopup('❌ Não foi possível criar a campanha: ' + error.message);
+
+  const { error: membroError } = await supabaseClient.from('campanha_membros').insert({ campanha_id: data.id, user_id: session.user.id, papel: 'mestre' });
+  if (membroError) console.warn('Campanha criada, mas vínculo do Mestre falhou:', membroError.message);
+
+  campanhasDisponiveis.push(data);
+  await selecionarCampanha(data.id);
+  fecharNovaCampanha();
+  if (nomeInput) nomeInput.value = '';
+  if (descricaoInput) descricaoInput.value = '';
+  mostrarPopup(`⚔️ Campanha "${nome}" criada com dados separados.`);
+}
+
 // --- NAVEGAÇÃO DE ABAS ---
 function mudarAba(nomeAba, evento) {
-  const abasValidas = ['ficha', 'grupo', 'mapa', 'rolagens', 'galeria'];
+  const abasValidas = ['ficha', 'campanhas', 'grupo', 'mapa', 'rolagens', 'galeria'];
   if (!abasValidas.includes(nomeAba)) return;
 
   const paineis = document.querySelectorAll('.painel');
@@ -510,6 +693,7 @@ async function salvarFichaNoSupabase(userIdDestino = null) {
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (!session) return alert('Você precisa estar logado para salvar sua ficha!');
   if (!dadosFichaAtual) return alert('Importe um arquivo JSON de ficha primeiro!');
+  if (!obterCampanhaIdAtual()) return alert('Selecione uma campanha antes de salvar a ficha.');
 
   const nomeChar = dadosFichaAtual.nome || dadosFichaAtual.personagem_nome || 'Personagem';
   const ehEdicaoMestre = Boolean(ehMestreGlobal && userIdDestino && userIdDestino !== session.user.id);
@@ -523,9 +707,11 @@ async function salvarFichaNoSupabase(userIdDestino = null) {
       .update({
         nome_personagem: nomeChar,
         dados_ficha: dadosFichaAtual,
-        updated_at: new Date()
+        updated_at: new Date(),
+        campanha_id: obterCampanhaIdAtual()
       })
-      .eq('user_id', idDestino);
+      .eq('user_id', idDestino)
+      .eq('campanha_id', obterCampanhaIdAtual());
   } else {
     resultado = await supabaseClient
       .from('fichas')
@@ -533,8 +719,9 @@ async function salvarFichaNoSupabase(userIdDestino = null) {
         user_id: session.user.id,
         nome_personagem: nomeChar,
         dados_ficha: dadosFichaAtual,
-        updated_at: new Date()
-      }, { onConflict: 'user_id' });
+        updated_at: new Date(),
+        campanha_id: obterCampanhaIdAtual()
+      }, { onConflict: 'user_id,campanha_id' });
   }
 
   if (resultado.error) {
@@ -550,6 +737,7 @@ async function carregarFichaDoUsuario(userId) {
     .from('fichas')
     .select('*')
     .eq('user_id', userId)
+    .eq('campanha_id', obterCampanhaIdAtual())
     .maybeSingle();
 
   if (error) {
@@ -668,7 +856,8 @@ async function carregarFichasDoGrupo() {
 
   const { data, error } = await supabaseClient
     .from('fichas')
-    .select('*');
+    .select('*')
+    .eq('campanha_id', obterCampanhaIdAtual());
 
   if (error || !data || data.length === 0) {
     lista.innerHTML = '<p style="color: #a8a8b3;">Nenhuma ficha encontrada no grupo.</p>';
@@ -750,18 +939,24 @@ async function fazerUploadMapa() {
     .getPublicUrl(fileName);
   const publicUrl = data.publicUrl;
 
-  await supabaseClient.from('mapas').upsert({ id: 1, url_mapa: publicUrl });
+  const campanhaId = obterCampanhaIdAtual();
+  if (!campanhaId) return alert('Selecione uma campanha antes de publicar o mapa.');
+  const { data: mapaExistente } = await supabaseClient.from('mapas').select('id').eq('campanha_id', campanhaId).limit(1).maybeSingle();
+  if (mapaExistente?.id) await supabaseClient.from('mapas').update({ url_mapa: publicUrl }).eq('id', mapaExistente.id).eq('campanha_id', campanhaId);
+  else await supabaseClient.from('mapas').insert({ url_mapa: publicUrl, campanha_id: campanhaId });
 
   exibirMapaNaTela(publicUrl);
   if (canalMesa) {
-    canalMesa.send({ type: 'broadcast', event: 'novo_mapa', payload: { url: publicUrl } });
+    canalMesa.send({ type: 'broadcast', event: 'novo_mapa', payload: { url: publicUrl, campanha_id: obterCampanhaIdAtual() } });
   }
   mostrarPopup('🗺️ Mapa atualizado com sucesso!');
 }
 
 async function carregarMapaAtual() {
   if (!supabaseClient) return;
-  const { data } = await supabaseClient.from('mapas').select('url_mapa').eq('id', 1).single();
+  const campanhaId = obterCampanhaIdAtual();
+  if (!campanhaId) return;
+  const { data } = await supabaseClient.from('mapas').select('url_mapa').eq('campanha_id', campanhaId).limit(1).maybeSingle();
   if (data && data.url_mapa) {
     exibirMapaNaTela(data.url_mapa);
   }
@@ -864,7 +1059,7 @@ function configurarPanMapa() {
         canalMesa.send({
           type: 'broadcast',
           event: 'vtt_zoom',
-          payload: { zoom: vttZoom, panX: vttPanX, panY: vttPanY }
+          payload: { zoom: vttZoom, panX: vttPanX, panY: vttPanY, campanha_id: obterCampanhaIdAtual() }
         });
       }
     }
@@ -915,7 +1110,7 @@ function alterarZoomMaster(valor) {
     canalMesa.send({
       type: 'broadcast',
       event: 'vtt_zoom',
-      payload: { zoom: vttZoom, panX: vttPanX, panY: vttPanY }
+      payload: { zoom: vttZoom, panX: vttPanX, panY: vttPanY, campanha_id: obterCampanhaIdAtual() }
     });
   }
 }
@@ -959,7 +1154,7 @@ function darPingNoMapa(event) {
     canalMesa.send({
       type: 'broadcast',
       event: 'vtt_ping',
-      payload: { x, y }
+      payload: { x, y, campanha_id: obterCampanhaIdAtual() }
     });
   }
   criarEfeitoPing(x, y);
@@ -992,7 +1187,7 @@ async function abrirModalConfigToken() {
 
   let imagensHtml = '<p style="color: #a8a8b3; font-size: 0.85rem;">Carregando galeria...</p>';
   if (supabaseClient) {
-    const { data } = await supabaseClient.from('galeria_imagens').select('*').order('criado_em', { ascending: false });
+    const { data } = await supabaseClient.from('galeria_imagens').select('*').eq('campanha_id', obterCampanhaIdAtual()).order('criado_em', { ascending: false });
     if (data && data.length > 0) {
       imagensHtml = `
         <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; max-height: 120px; overflow-y: auto; background: #0b0d12; padding: 6px; border-radius: 4px; border: 1px solid #29292e;">
@@ -1208,7 +1403,8 @@ function transmitirMovimentoToken(token, x, y) {
       tamanho: Number(token.dataset.tokenTamanho) || 45,
       imagem: token.dataset.tokenImagem || '',
       hpAtual: Number(token.dataset.tokenHpAtual) || 0,
-      hpMax: Number(token.dataset.tokenHpMax) || 50
+      hpMax: Number(token.dataset.tokenHpMax) || 50,
+      campanha_id: obterCampanhaIdAtual()
     }
   });
 }
@@ -1398,7 +1594,7 @@ function registrarRolagemHistorico(descricao, resultado, veioDoBroadcast = false
     canalMesa.send({
       type: 'broadcast',
       event: 'nova_rolagem',
-      payload: { descricao, resultado: textoRes }
+      payload: { descricao, resultado: textoRes, campanha_id: obterCampanhaIdAtual() }
     });
   }
 }
@@ -1435,7 +1631,9 @@ async function fazerUploadImagem() {
   const publica = (visibilidadeInput?.value || 'publica') === 'publica';
   const extensao = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
   const identificador = (window.crypto?.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).slice(2);
-  const storagePath = `${pasta}/${Date.now()}_${identificador}.${extensao}`;
+  const campanhaId = obterCampanhaIdAtual();
+  if (!campanhaId) return mostrarPopup('❌ Selecione uma campanha antes de enviar imagens.');
+  const storagePath = `${campanhaId}/${pasta}/${Date.now()}_${identificador}.${extensao}`;
   const bucketGaleria = publica ? 'galeria' : 'galeria-privada';
 
   const btn = document.querySelector('.btn-publicar-galeria');
@@ -1464,6 +1662,7 @@ async function fazerUploadImagem() {
       publico: publica,
       storage_path: storagePath,
       criado_por: (await supabaseClient.auth.getUser()).data.user?.id || null,
+      campanha_id: obterCampanhaIdAtual(),
       criado_em: new Date().toISOString()
     });
     if (dbError) throw dbError;
@@ -1500,7 +1699,8 @@ async function carregarGaleria(forcar = false) {
 
   let query = supabaseClient
     .from('galeria_imagens')
-    .select('id,url,categoria,pasta,nome,publico,storage_path,criado_em,criado_por')
+    .select('id,url,categoria,pasta,nome,publico,storage_path,criado_em,criado_por,campanha_id')
+    .eq('campanha_id', obterCampanhaIdAtual())
     .order('criado_em', { ascending: false });
 
   if (!ehMestreGlobal) query = query.eq('publico', true);
@@ -1654,7 +1854,7 @@ function fecharImagemMestre(veioDoBroadcast = false) {
   document.body.classList.remove('imagem-mestre-aberta');
 
   if (!veioDoBroadcast && ehMestreGlobal && canalMesa) {
-    canalMesa.send({ type: 'broadcast', event: 'galeria_fechar_imagem', payload: {} });
+    canalMesa.send({ type: 'broadcast', event: 'galeria_fechar_imagem', payload: { campanha_id: obterCampanhaIdAtual() } });
   }
 }
 
@@ -1744,6 +1944,10 @@ window.fazerLogin = fazerLogin;
 window.fazerCadastro = fazerCadastro;
 window.fazerLogout = fazerLogout;
 window.mudarAba = mudarAba;
+window.selecionarCampanha = selecionarCampanha;
+window.abrirNovaCampanha = abrirNovaCampanha;
+window.fecharNovaCampanha = fecharNovaCampanha;
+window.criarNovaCampanha = criarNovaCampanha;
 window.importarArquivoJSON = importarArquivoJSON;
 window.abrirCriadorFicha = abrirCriadorFicha;
 window.fecharCriadorFicha = fecharCriadorFicha;

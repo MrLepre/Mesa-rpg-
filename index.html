@@ -35,6 +35,7 @@
     <nav class="abas-navegacao">
       <button class="ativo" onclick="mudarAba('ficha', event)">Minha Ficha</button>
       <button onclick="mudarAba('campanhas', event)">Campanhas</button>
+      <button id="btn-aba-sistemas" onclick="mudarAba('sistemas', event)" style="display:none;">Sistemas RPG</button>
       <button onclick="mudarAba('grupo', event)">Fichas do Grupo</button>
       <button onclick="mudarAba('mapa', event)">Mapa</button>
       <button onclick="mudarAba('rolagens', event)">Rolagens</button>
@@ -103,6 +104,51 @@
       </div>
     </section>
 
+    <section id="aba-sistemas" class="painel">
+      <div class="cabecalho-campanhas">
+        <div>
+          <span class="eyebrow-galeria">⚙️ Forja das Regras</span>
+          <h2>Sistemas RPG</h2>
+          <p class="subtexto-galeria">Crie sistemas reutilizáveis. O sistema define a estrutura da ficha; a campanha guarda os personagens.</p>
+        </div>
+        <button id="btn-novo-sistema" class="btn-nova-campanha" style="display:none;" onclick="abrirNovoSistema()">＋ Novo Sistema</button>
+      </div>
+      <div id="painel-novo-sistema" class="card-secao card-nova-campanha" style="display:none;">
+        <h3 id="titulo-editor-sistema">👑 Criar novo sistema</h3>
+        <p>Defina os componentes básicos. Você poderá alterar o sistema depois sem misturar dados das campanhas.</p>
+        <input type="hidden" id="sistema-editando-id">
+        <div class="form-sistema">
+          <label><span>Nome do sistema</span><input id="novo-sistema-nome" type="text" maxlength="100" placeholder="Ex.: D&D 5e"></label>
+          <label><span>Descrição</span><textarea id="novo-sistema-descricao" maxlength="500" rows="2" placeholder="Como funciona este sistema?"></textarea></label>
+          <div class="builder-bloco">
+            <div class="builder-titulo"><strong>🎲 Dados disponíveis</strong><small>Selecione os dados usados pelo sistema.</small></div>
+            <div id="builder-dados" class="builder-chips"></div>
+          </div>
+          <div class="builder-bloco">
+            <div class="builder-titulo"><strong>🛡️ Atributos</strong><button type="button" class="btn-pequeno" onclick="adicionarCampoSistema('atributos')">＋ Adicionar</button></div>
+            <div id="builder-atributos" class="builder-lista"></div>
+          </div>
+          <div class="builder-bloco">
+            <div class="builder-titulo"><strong>❤️ Recursos</strong><button type="button" class="btn-pequeno" onclick="adicionarCampoSistema('recursos')">＋ Adicionar</button></div>
+            <div id="builder-recursos" class="builder-lista"></div>
+          </div>
+          <div class="builder-bloco">
+            <div class="builder-titulo"><strong>🎯 Perícias</strong><button type="button" class="btn-pequeno" onclick="adicionarCampoSistema('pericias')">＋ Adicionar</button></div>
+            <div id="builder-pericias" class="builder-lista"></div>
+          </div>
+          <div class="builder-bloco">
+            <div class="builder-titulo"><strong>📜 Campos livres da ficha</strong><button type="button" class="btn-pequeno" onclick="adicionarCampoSistema('campos')">＋ Adicionar</button></div>
+            <div id="builder-campos" class="builder-lista"></div>
+          </div>
+          <div class="builder-acoes">
+            <button onclick="salvarSistema()" class="btn-ficha-principal">⚒️ Salvar Sistema</button>
+            <button onclick="fecharNovoSistema()" class="btn-secundario">Cancelar</button>
+          </div>
+        </div>
+      </div>
+      <div id="lista-sistemas" class="lista-campanhas"><div class="estado-galeria">Faça login para carregar os sistemas.</div></div>
+    </section>
+
     <section id="aba-ficha" class="painel ativo">
       <h2>Minha Ficha do Personagem</h2>
       <div class="card-secao">
@@ -112,8 +158,8 @@
       </div>
       <div class="card-secao" style="margin-top: 15px;">
         <h3>2. Criar Ficha Diretamente na Mesa</h3>
-        <p>Crie um novo personagem usando a ficha completa de Crônicas de Camelot, sem precisar sair da mesa.</p>
-        <button onclick="abrirCriadorFicha()" class="btn-ficha-principal">⚔️ Criar Nova Ficha na Mesa</button>
+        <p>Crie um novo personagem usando a ficha do sistema da campanha ativa, sem precisar sair da mesa.</p>
+        <button onclick="abrirCriadorFicha()" class="btn-ficha-principal">⚔️ Criar Ficha da Campanha</button>
       </div>
       <div class="card-secao" style="margin-top: 15px;">
         <h3>3. Evolução e Sincronização</h3>

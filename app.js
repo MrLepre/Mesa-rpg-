@@ -319,6 +319,10 @@ function atualizarInterfaceAuth(user) {
     if (nickDisplay) nickDisplay.innerText = nickExibicao;
 
     ehMestreGlobal = (user.email || '').toLowerCase() === 'mestre@rpg.local';
+    const btnAbaSistemas = document.getElementById('btn-aba-sistemas');
+    const btnNovoSistema = document.getElementById('btn-novo-sistema');
+    if (btnAbaSistemas) btnAbaSistemas.style.display = ehMestreGlobal ? 'inline-flex' : 'none';
+    if (btnNovoSistema) btnNovoSistema.style.display = ehMestreGlobal ? 'inline-flex' : 'none';
     if (ehMestreGlobal) {
       if (badgeMestre) badgeMestre.style.display = 'inline-block';
       if (painelMapaMestre) painelMapaMestre.style.display = 'block';
@@ -332,6 +336,10 @@ function atualizarInterfaceAuth(user) {
     }
   } else {
     ehMestreGlobal = false;
+    const btnAbaSistemas = document.getElementById('btn-aba-sistemas');
+    const btnNovoSistema = document.getElementById('btn-novo-sistema');
+    if (btnAbaSistemas) btnAbaSistemas.style.display = 'none';
+    if (btnNovoSistema) btnNovoSistema.style.display = 'none';
     if (formLogin) formLogin.style.display = 'flex';
     if (statusUsuario) statusUsuario.style.display = 'none';
     if (painelMapaMestre) painelMapaMestre.style.display = 'none';
@@ -635,9 +643,109 @@ async function criarNovaCampanha() {
   mostrarPopup(`⚔️ Campanha "${nome}" criada com dados separados.`);
 }
 
+
+// ==========================================
+// SISTEMAS RPG — ETAPA 2
+// ==========================================
+const DADOS_DISPONIVEIS_SISTEMA = ['d4','d6','d8','d10','d12','d20','d100'];
+const CAMPOS_SISTEMA_PADRAO = {
+  atributos: [{nome:'Força', sigla:'FOR'}, {nome:'Destreza', sigla:'DES'}, {nome:'Constituição', sigla:'CON'}],
+  recursos: [{nome:'Vida', sigla:'HP', tipo:'numero'}, {nome:'Energia', sigla:'EN', tipo:'numero'}],
+  pericias: [{nome:'Percepção', atributo:'FOR'}],
+  campos: [{nome:'História', tipo:'texto'}]
+};
+let builderSistema = { dados: [], atributos: [], recursos: [], pericias: [], campos: [] };
+
+function iniciarBuilderSistema(config = null) {
+  const c = config || CAMPOS_SISTEMA_PADRAO;
+  builderSistema = {
+    dados: Array.isArray(config?.dados) ? [...config.dados] : ['d20'],
+    atributos: Array.isArray(c.atributos) ? c.atributos.map(x=>({...x})) : [],
+    recursos: Array.isArray(c.recursos) ? c.recursos.map(x=>({...x})) : [],
+    pericias: Array.isArray(c.pericias) ? c.pericias.map(x=>({...x})) : [],
+    campos: Array.isArray(c.campos) ? c.campos.map(x=>({...x})) : []
+  };
+  renderizarBuilderSistema();
+}
+
+function abrirNovoSistema() {
+  if (!ehMestreGlobal) return;
+  document.getElementById('sistema-editando-id').value = '';
+  document.getElementById('titulo-editor-sistema').textContent = '👑 Criar novo sistema';
+  document.getElementById('novo-sistema-nome').value = '';
+  document.getElementById('novo-sistema-descricao').value = '';
+  iniciarBuilderSistema();
+  document.getElementById('painel-novo-sistema').style.display = 'block';
+  document.getElementById('novo-sistema-nome').focus();
+}
+function fecharNovoSistema() { document.getElementById('painel-novo-sistema').style.display='none'; }
+function escSistema(v){ return escaparHTML(v); }
+function renderizarBuilderSistema(){
+  const chips=document.getElementById('builder-dados');
+  if(chips) chips.innerHTML=DADOS_DISPONIVEIS_SISTEMA.map(d=>`<button type="button" class="builder-chip ${builderSistema.dados.includes(d)?'ativo':''}" onclick="alternarDadoSistema('${d}')">${d}</button>`).join('');
+  renderListaBuilder('atributos','atributo'); renderListaBuilder('recursos','recurso'); renderListaBuilder('pericias','pericia'); renderListaBuilder('campos','campo');
+}
+function alternarDadoSistema(d){ builderSistema.dados=builderSistema.dados.includes(d)?builderSistema.dados.filter(x=>x!==d):[...builderSistema.dados,d]; renderizarBuilderSistema(); }
+function adicionarCampoSistema(tipo){
+  const defaults={atributos:{nome:'Novo Atributo',sigla:'ATR'},recursos:{nome:'Novo Recurso',sigla:'REC',tipo:'numero'},pericias:{nome:'Nova Perícia',atributo:''},campos:{nome:'Novo Campo',tipo:'texto'}};
+  builderSistema[tipo].push({...defaults[tipo]}); renderizarBuilderSistema();
+}
+function atualizarCampoSistema(tipo,index,chave,valor){ if(builderSistema[tipo]?.[index]) builderSistema[tipo][index][chave]=valor; }
+function removerCampoSistema(tipo,index){ builderSistema[tipo].splice(index,1); renderizarBuilderSistema(); }
+function renderListaBuilder(tipo, classe){
+  const el=document.getElementById('builder-'+tipo); if(!el) return;
+  const lista=builderSistema[tipo];
+  if(!lista.length){ el.innerHTML='<div class="estado-galeria">Nenhum campo configurado.</div>'; return; }
+  el.innerHTML=lista.map((item,i)=>{
+    if(tipo==='atributos') return `<div class="builder-linha"><input value="${escSistema(item.nome)}" oninput="atualizarCampoSistema('atributos',${i},'nome',this.value)" placeholder="Nome"><input value="${escSistema(item.sigla||'')}" maxlength="8" oninput="atualizarCampoSistema('atributos',${i},'sigla',this.value)" placeholder="Sigla"><button type="button" class="btn-remover-campo" onclick="removerCampoSistema('atributos',${i})">✕</button></div>`;
+    if(tipo==='recursos') return `<div class="builder-linha"><input value="${escSistema(item.nome)}" oninput="atualizarCampoSistema('recursos',${i},'nome',this.value)" placeholder="Nome"><select onchange="atualizarCampoSistema('recursos',${i},'tipo',this.value)"><option value="numero" ${item.tipo==='numero'?'selected':''}>Número</option><option value="texto" ${item.tipo==='texto'?'selected':''}>Texto</option></select><button type="button" class="btn-remover-campo" onclick="removerCampoSistema('recursos',${i})">✕</button></div>`;
+    if(tipo==='pericias') return `<div class="builder-linha"><input value="${escSistema(item.nome)}" oninput="atualizarCampoSistema('pericias',${i},'nome',this.value)" placeholder="Nome"><input value="${escSistema(item.atributo||'')}" oninput="atualizarCampoSistema('pericias',${i},'atributo',this.value)" placeholder="Atributo relacionado"><button type="button" class="btn-remover-campo" onclick="removerCampoSistema('pericias',${i})">✕</button></div>`;
+    return `<div class="builder-linha campo-livre"><input value="${escSistema(item.nome)}" oninput="atualizarCampoSistema('campos',${i},'nome',this.value)" placeholder="Nome do campo"><select onchange="atualizarCampoSistema('campos',${i},'tipo',this.value)"><option value="texto" ${item.tipo==='texto'?'selected':''}>Texto</option><option value="numero" ${item.tipo==='numero'?'selected':''}>Número</option><option value="area" ${item.tipo==='area'?'selected':''}>Texto longo</option></select><button type="button" class="btn-remover-campo" onclick="removerCampoSistema('campos',${i})">✕</button></div>`;
+  }).join('');
+}
+
+async function carregarSistemas(){
+  if(!supabaseClient) return;
+  const lista=document.getElementById('lista-sistemas'); if(!lista) return;
+  const {data,error}=await supabaseClient.from('sistemas').select('id,nome,descricao,configuracao,criado_por,created_at').order('created_at',{ascending:true});
+  if(error){ lista.innerHTML='<div class="estado-galeria">Execute a atualização SQL da Etapa 2 no Supabase.</div>'; console.error(error); return; }
+  lista.innerHTML='';
+  (data||[]).forEach(s=>{
+    const card=document.createElement('article'); card.className='card-sistema'+(s.configuracao?.tipo==='legado'?' legado':'');
+    const cfg=s.configuracao||{};
+    const resumo=[`${(cfg.dados||[]).length} dados`,`${(cfg.atributos||[]).length} atributos`,`${(cfg.recursos||[]).length} recursos`,`${(cfg.pericias||[]).length} perícias`].join(' · ');
+    card.innerHTML=`<div class="card-sistema-topo"><div><h3>⚙️ ${escaparHTML(s.nome)}</h3><p>${escaparHTML(s.descricao||'Sem descrição.')}</p><div class="card-sistema-meta">${escaparHTML(resumo)}</div></div>${cfg.tipo==='legado'?'<span class="badge-legado">LEGADO</span>':''}</div><div class="card-sistema-acoes"><button class="btn-sistema-acao" onclick="abrirFichaDoSistema('${s.id}')">📖 Abrir Ficha</button>${ehMestreGlobal?`<button class="btn-sistema-acao" onclick="editarSistema('${s.id}')">✏️ Editar</button>`:''}</div>`;
+    lista.appendChild(card);
+  });
+}
+async function editarSistema(id){
+  const s=(await supabaseClient.from('sistemas').select('*').eq('id',id).single()).data; if(!s)return;
+  document.getElementById('sistema-editando-id').value=s.id;
+  document.getElementById('titulo-editor-sistema').textContent='⚒️ Editar sistema';
+  document.getElementById('novo-sistema-nome').value=s.nome||''; document.getElementById('novo-sistema-descricao').value=s.descricao||'';
+  iniciarBuilderSistema(s.configuracao||{}); document.getElementById('painel-novo-sistema').style.display='block'; document.getElementById('novo-sistema-nome').focus();
+}
+async function salvarSistema(){
+  if(!ehMestreGlobal) return; const nome=document.getElementById('novo-sistema-nome')?.value.trim(); if(!nome)return mostrarPopup('❌ Informe o nome do sistema.');
+  const descricao=document.getElementById('novo-sistema-descricao')?.value.trim()||''; const id=document.getElementById('sistema-editando-id')?.value||null;
+  const config={versao:1,tipo:'generico',dados:[...builderSistema.dados],atributos:builderSistema.atributos.map(x=>({...x})),recursos:builderSistema.recursos.map(x=>({...x})),pericias:builderSistema.pericias.map(x=>({...x})),campos:builderSistema.campos.map(x=>({...x})),ficha:'ficha-generica.html'};
+  let q=supabaseClient.from('sistemas'); const payload={nome,descricao,configuracao:config,updated_at:new Date().toISOString()};
+  const result=id?await q.update(payload).eq('id',id).select().single():await q.insert({...payload,criado_por:(await supabaseClient.auth.getUser()).data.user?.id}).select().single();
+  if(result.error)return mostrarPopup('❌ Erro ao salvar sistema: '+result.error.message);
+  fecharNovoSistema(); await carregarSistemas(); mostrarPopup(`⚙️ Sistema "${nome}" salvo com sucesso!`);
+}
+async function abrirFichaDoSistema(id){
+  const {data,error}=await supabaseClient.from('sistemas').select('*').eq('id',id).single(); if(error||!data)return mostrarPopup('❌ Sistema não encontrado.');
+  sistemaAtual=data;
+  const modal=document.getElementById('modal-criador-ficha'), iframe=document.getElementById('iframe-criador-ficha'); if(!modal||!iframe)return;
+  if(data.configuracao?.tipo==='legado') iframe.src='ficha-editor.html?modo=criacao&t='+Date.now(); else iframe.src='ficha-generica.html?modo=criacao&sistema='+encodeURIComponent(id)+'&t='+Date.now();
+  const titulo=document.querySelector('#modal-criador-ficha .modal-ficha-cabecalho h2'); if(titulo)titulo.textContent=`⚔️ Ficha — ${data.nome}`;
+  modal.style.display='flex';
+}
+
 // --- NAVEGAÇÃO DE ABAS ---
 function mudarAba(nomeAba, evento) {
-  const abasValidas = ['ficha', 'campanhas', 'grupo', 'mapa', 'rolagens', 'galeria'];
+  const abasValidas = ['ficha', 'campanhas', 'sistemas', 'grupo', 'mapa', 'rolagens', 'galeria'];
   if (!abasValidas.includes(nomeAba)) return;
 
   const paineis = document.querySelectorAll('.painel');
@@ -668,6 +776,7 @@ function mudarAba(nomeAba, evento) {
     abasCarregadas.galeria = true;
     carregarGaleria();
   }
+  if (nomeAba === 'sistemas' && supabaseClient) carregarSistemas();
 }
 
 // --- FICHA DO PERSONAGEM ---
@@ -780,7 +889,14 @@ function abrirCriadorFicha() {
   const modal = document.getElementById('modal-criador-ficha');
   const iframe = document.getElementById('iframe-criador-ficha');
   if (!modal || !iframe) return;
-  iframe.src = 'ficha-editor.html?modo=criacao&t=' + Date.now();
+  if (!campanhaAtual) return mostrarPopup('❌ Selecione uma campanha antes de criar a ficha.');
+  if (sistemaAtual?.configuracao?.tipo === 'legado' || sistemaAtual?.configuracao?.ficha === 'ficha-editor.html') {
+    iframe.src = 'ficha-editor.html?modo=criacao&t=' + Date.now();
+  } else {
+    iframe.src = 'ficha-generica.html?modo=criacao&sistema=' + encodeURIComponent(sistemaAtual?.id || '') + '&t=' + Date.now();
+  }
+  const titulo = document.querySelector('#modal-criador-ficha .modal-ficha-cabecalho h2');
+  if (titulo) titulo.textContent = `⚔️ Criar Nova Ficha — ${sistemaAtual?.nome || 'Sistema RPG'}`;
   modal.style.display = 'flex';
 }
 

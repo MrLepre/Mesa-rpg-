@@ -276,3 +276,17 @@ with check (public.eh_mestre_da_campanha(campanha_id));
 -- Uma ficha por jogador em cada campanha.
 create unique index if not exists ux_fichas_usuario_campanha
   on public.fichas(user_id, campanha_id);
+
+-- =============================================================
+-- ETAPA 2 — CONSTRUTOR DE SISTEMAS / FICHAS GENÉRICAS
+-- =============================================================
+-- A tabela sistemas já foi criada na Etapa 1. Este bloco apenas endurece
+-- os campos necessários para o construtor e cria validações básicas.
+alter table public.sistemas add column if not exists configuracao jsonb not null default '{}'::jsonb;
+create index if not exists idx_sistemas_nome on public.sistemas(lower(nome));
+
+-- Garante que somente o Mestre possa alterar a definição de um sistema.
+drop policy if exists "Mestre exclui sistemas" on public.sistemas;
+create policy "Mestre exclui sistemas"
+on public.sistemas for delete to authenticated
+using (lower(coalesce(auth.jwt()->>'email','')) = 'mestre@rpg.local');

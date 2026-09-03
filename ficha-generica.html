@@ -1,9 +1,57 @@
-<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ficha RPG</title><link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=EB+Garamond:wght@400;600&display=swap" rel="stylesheet"><style>body{margin:0;background:#080a0f;color:#e2d9c5;font-family:'EB Garamond',serif;padding:12px}.ficha{max-width:1000px;margin:auto;border:2px solid #c5a059;background:#151821;padding:20px;border-radius:8px;box-shadow:0 0 30px #000}.top{text-align:center;border-bottom:1px solid #c5a059;margin-bottom:18px}.top h1{font-family:Cinzel;color:#f3d075;margin:0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}.bloco{border:1px solid #403522;padding:12px;border-radius:6px;background:#0d1018}.bloco h2{font-family:Cinzel;color:#f3d075;font-size:1rem}.campo{display:grid;gap:4px;margin-bottom:8px}.campo label{color:#e6ca88}.campo input,.campo textarea{width:100%;box-sizing:border-box;background:#080a0f;color:#eee;border:1px solid #403522;border-radius:4px;padding:8px;font:inherit}.acoes{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}.acoes button{padding:9px 14px;background:#211c12;color:#f3d075;border:1px solid #c5a059;border-radius:5px;font-weight:700;cursor:pointer}@media(max-width:600px){.ficha{padding:12px}.grid{grid-template-columns:1fr}}</style></head><body><div class="ficha"><div class="top"><h1 id="titulo">Sistema RPG</h1><p id="subtitulo">Ficha de personagem</p></div><div id="conteudo"></div><div class="acoes"><button onclick="enviar()">⚔️ Enviar para a Mesa</button><button onclick="window.print()">📜 Imprimir / PDF</button></div></div><script>
-let sistema=null;const dados={};
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ficha RPG</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=EB+Garamond:wght@400;600&display=swap" rel="stylesheet"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#080a0f;--panel:#151821;--gold:#c5a059;--gold2:#f3d075;--text:#e2d9c5;--input:#080a0f}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 50% 0%,#1f2738 0%,#080a0f 70%);color:var(--text);font-family:'EB Garamond',serif;padding:12px;overflow-x:hidden}.ficha{max-width:1050px;margin:auto;border:2px solid var(--gold);background:var(--panel);padding:20px;border-radius:8px;box-shadow:0 0 30px #000}.top{text-align:center;border-bottom:1px solid var(--gold);margin-bottom:18px;padding-bottom:12px}.top h1{font-family:Cinzel;color:var(--gold2);margin:0;font-size:2em}.top p{margin:5px 0;color:#e6ca88}.bloco{border:1px solid #403522;padding:14px;margin-bottom:14px;border-radius:6px;background:linear-gradient(135deg,rgba(15,18,25,.9),rgba(10,12,17,.98));box-shadow:0 4px 15px rgba(0,0,0,.35)}.bloco h2{font-family:Cinzel;color:var(--gold2);font-size:1.05rem;border-bottom:1px solid #403522;padding-bottom:7px;margin:0 0 12px}.grid{display:grid;grid-template-columns:repeat(var(--cols,2),minmax(0,1fr));gap:10px}.campo{display:grid;gap:4px;margin-bottom:2px}.campo label{color:#e6ca88;font-weight:600}.campo input,.campo textarea{width:100%;background:var(--input);color:#eee;border:1px solid #403522;border-radius:4px;padding:8px;font:inherit}.campo textarea{resize:vertical;min-height:85px}.campo input:focus,.campo textarea:focus{outline:none;border-color:var(--gold2);box-shadow:0 0 7px rgba(243,208,117,.25)}.checkbox{display:flex;align-items:center;gap:7px;background:var(--input);padding:9px;border:1px solid #403522;border-radius:4px}.checkbox input{width:auto}.acoes{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}.acoes button{padding:10px 14px;background:#211c12;color:var(--gold2);border:1px solid var(--gold);border-radius:5px;font-weight:700;cursor:pointer}.vazio{opacity:.7;text-align:center;padding:20px}.span-2{grid-column:span 2}.span-3{grid-column:span 3}.span-4{grid-column:span 4}@media(max-width:700px){.ficha{padding:12px}.top h1{font-size:1.5em}.grid{grid-template-columns:1fr!important}.span-2,.span-3,.span-4{grid-column:auto}}
+</style>
+</head>
+<body>
+<div class="ficha">
+  <div class="top"><h1 id="titulo">Sistema RPG</h1><p id="subtitulo">Ficha de personagem</p></div>
+  <div id="conteudo"><p class="vazio">Carregando sistema...</p></div>
+  <div class="acoes"><button onclick="enviar()">⚔️ Enviar para a Mesa</button><button onclick="window.print()">📜 Imprimir / PDF</button></div>
+</div>
+<script>
+let sistema=null;
 function esc(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;')}
-function campo(id,nome,tipo='texto'){return `<div class="campo"><label>${esc(nome)}</label>${tipo==='area'?`<textarea id="${id}" rows="4"></textarea>`:`<input id="${id}" type="${tipo==='numero'?'number':'text'}">`}</div>`}
-async function iniciar(){const p=new URLSearchParams(location.search),id=p.get('sistema');if(!id)return;const url='https://rolrbrtpqbchyxmjmvzr.supabase.co';const key='sb_publishable_mJmJfELKk4O1HCTzoKxDdw_EWaiv4j1';const sb=window.supabase.createClient(url,key);const r=await sb.from('sistemas').select('*').eq('id',id).single();if(r.error)return document.getElementById('conteudo').innerHTML='<p>Sistema não encontrado.</p>';sistema=r.data;const c=sistema.configuracao||{};document.getElementById('titulo').textContent=sistema.nome;let html='<div class="bloco"><h2>📜 Identidade</h2><div class="grid">'+campo('nome','Nome do Personagem')+campo('nivel','Nível','numero')+'</div></div>';if((c.atributos||[]).length)html+='<div class="bloco"><h2>🛡️ Atributos</h2><div class="grid">'+c.atributos.map((x,i)=>campo('atributo_'+i,x.nome,'numero')).join('')+'</div></div>';if((c.recursos||[]).length)html+='<div class="bloco"><h2>❤️ Recursos</h2><div class="grid">'+c.recursos.map((x,i)=>campo('recurso_'+i,x.nome,x.tipo||'numero')).join('')+'</div></div>';if((c.pericias||[]).length)html+='<div class="bloco"><h2>🎯 Perícias</h2><div class="grid">'+c.pericias.map((x,i)=>campo('pericia_'+i,x.nome,'numero')).join('')+'</div></div>';if((c.campos||[]).length)html+='<div class="bloco"><h2>📚 Registro</h2>'+c.campos.map((x,i)=>campo('campo_'+i,x.nome,x.tipo||'texto')).join('')+'</div>';document.getElementById('conteudo').innerHTML=html;}
-function obter(){const out={_sistema_id:sistema?.id,_sistema_nome:sistema?.nome};document.querySelectorAll('#conteudo input,#conteudo textarea').forEach(e=>out[e.id]=e.value);return out}
-function enviar(){window.parent.postMessage({type:'cronicas-camelot-ficha-pronta',dados:obter(),modo:'criacao'},location.origin)}
+function catalogo(c){return [...(c.atributos||[]).map((x,i)=>({...x,id:x.id||`atributo_${i}`,grupo:'Atributo',tipo:'numero'})),...(c.recursos||[]).map((x,i)=>({...x,id:x.id||`recurso_${i}`,grupo:'Recurso',tipo:x.tipo||'numero'})),...(c.pericias||[]).map((x,i)=>({...x,id:x.id||`pericia_${i}`,grupo:'Perícia',tipo:'numero'})),...(c.campos||[]).map((x,i)=>({...x,id:x.id||`campo_${i}`,grupo:'Campo',tipo:x.tipo||'texto'}))]}
+function inputCampo(c){
+ const required=c.obrigatorio?' required':''; const placeholder=esc(c.placeholder||'');
+ if(c.tipo==='area') return `<textarea id="${esc(c.id)}" rows="4" placeholder="${placeholder}"${required}></textarea>`;
+ if(c.tipo==='checkbox') return `<label class="checkbox"><input id="${esc(c.id)}" type="checkbox"> marcado</label>`;
+ return `<input id="${esc(c.id)}" type="${c.tipo==='numero'?'number':'text'}" value="${esc(c.valor_padrao||'')}" placeholder="${placeholder}"${required}>`;
+}
+function renderizar(c){
+ const mapa=new Map(catalogo(c).map(x=>[x.id,x]));
+ let html=`<section class="bloco"><h2>📜 Identidade</h2><div class="grid" style="--cols:2"><div class="campo"><label>Nome do Personagem</label><input id="nome" placeholder="Ex.: Sir Lancelot"></div><div class="campo"><label>Nível</label><input id="nivel" type="number" min="1" placeholder="1"></div></div></section>`;
+ const secoes=Array.isArray(c.secoes)&&c.secoes.length?c.secoes:[
+  {titulo:'Atributos',icone:'🛡️',colunas:3,campos:(c.atributos||[]).map((x,i)=>x.id||`atributo_${i}`)},
+  {titulo:'Recursos',icone:'❤️',colunas:3,campos:(c.recursos||[]).map((x,i)=>x.id||`recurso_${i}`)},
+  {titulo:'Perícias',icone:'🎯',colunas:2,campos:(c.pericias||[]).map((x,i)=>x.id||`pericia_${i}`)},
+  {titulo:'Registro',icone:'📚',colunas:1,campos:(c.campos||[]).map((x,i)=>x.id||`campo_${i}`)}
+ ];
+ secoes.forEach(s=>{
+   const campos=(s.campos||[]).map(id=>mapa.get(id)).filter(Boolean);
+   if(!campos.length)return;
+   html+=`<section class="bloco"><h2>${esc(s.icone||'◆')} ${esc(s.titulo||'Seção')}</h2><div class="grid" style="--cols:${Math.min(4,Math.max(1,Number(s.colunas||1)))}">${campos.map(x=>`<div class="campo span-${Math.min(4,Number(x.largura||1))}"><label>${esc(x.nome)}${x.obrigatorio?' *':''}</label>${inputCampo(x)}</div>`).join('')}</div></section>`;
+ });
+ document.getElementById('conteudo').innerHTML=html;
+}
+async function iniciar(){
+ const p=new URLSearchParams(location.search),id=p.get('sistema');
+ if(!id){document.getElementById('conteudo').innerHTML='<p class="vazio">Nenhum sistema foi informado.</p>';return}
+ const url='https://rolrbrtpqbchyxmjmvzr.supabase.co',key='sb_publishable_mJmFjELKk4O1HCTzoKxDdw_EWaiv4j1';
+ if(!window.supabase){document.getElementById('conteudo').innerHTML='<p class="vazio">Biblioteca do Supabase não carregada.</p>';return}
+ const sb=window.supabase.createClient(url,key); const r=await sb.from('sistemas').select('*').eq('id',id).single();
+ if(r.error){document.getElementById('conteudo').innerHTML='<p class="vazio">Sistema não encontrado.</p>';return}
+ sistema=r.data;const c=sistema.configuracao||{};document.getElementById('titulo').textContent=sistema.nome;renderizar(c);
+}
+function obter(){const out={_sistema_id:sistema?.id,_sistema_nome:sistema?.nome};document.querySelectorAll('#conteudo input,#conteudo textarea').forEach(e=>out[e.id]=e.type==='checkbox'?e.checked:e.value);return out}
+function enviar(){window.parent.postMessage({type:'cronicas-camelot-ficha-pronta',dados:obter(),modo:'criacao',sistema_id:sistema?.id},location.origin)}
 iniciar();
-</script></body></html>
+</script>
+</body></html>

@@ -94,6 +94,7 @@
         <div class="form-nova-campanha">
           <input id="nova-campanha-nome" type="text" maxlength="80" placeholder="Ex.: A Queda de Avalon">
           <input id="nova-campanha-descricao" type="text" maxlength="180" placeholder="Descrição curta (opcional)">
+          <label class="campo-formulario-campanha"><span>⚙️ Sistema RPG</span><select id="nova-campanha-sistema"><option value="">Carregando sistemas...</option></select></label>
           <button onclick="criarNovaCampanha()" class="btn-ficha-principal">⚔️ Criar Campanha</button>
           <button onclick="fecharNovaCampanha()" class="btn-secundario">Cancelar</button>
         </div>
@@ -115,31 +116,56 @@
       </div>
       <div id="painel-novo-sistema" class="card-secao card-nova-campanha" style="display:none;">
         <h3 id="titulo-editor-sistema">👑 Criar novo sistema</h3>
-        <p>Defina os componentes básicos. Você poderá alterar o sistema depois sem misturar dados das campanhas.</p>
+        <p>Defina as regras e monte visualmente a ficha. A estrutura fica salva dentro do sistema e pode ser reutilizada por várias campanhas.</p>
         <input type="hidden" id="sistema-editando-id">
         <div class="form-sistema">
           <label><span>Nome do sistema</span><input id="novo-sistema-nome" type="text" maxlength="100" placeholder="Ex.: D&D 5e"></label>
           <label><span>Descrição</span><textarea id="novo-sistema-descricao" maxlength="500" rows="2" placeholder="Como funciona este sistema?"></textarea></label>
-          <div class="builder-bloco">
-            <div class="builder-titulo"><strong>🎲 Dados disponíveis</strong><small>Selecione os dados usados pelo sistema.</small></div>
-            <div id="builder-dados" class="builder-chips"></div>
+
+          <div class="builder-etapa-nav">
+            <button type="button" class="builder-etapa ativo" onclick="mudarEtapaBuilder(1)">1. Componentes</button>
+            <button type="button" class="builder-etapa" onclick="mudarEtapaBuilder(2)">2. Layout da Ficha</button>
+            <button type="button" class="builder-etapa" onclick="mudarEtapaBuilder(3)">3. Pré-visualização</button>
           </div>
-          <div class="builder-bloco">
-            <div class="builder-titulo"><strong>🛡️ Atributos</strong><button type="button" class="btn-pequeno" onclick="adicionarCampoSistema('atributos')">＋ Adicionar</button></div>
-            <div id="builder-atributos" class="builder-lista"></div>
+
+          <div id="builder-etapa-1" class="builder-etapa-conteudo ativo">
+            <div class="builder-bloco">
+              <div class="builder-titulo"><strong>🎲 Dados disponíveis</strong><small>Selecione os dados usados pelo sistema.</small></div>
+              <div id="builder-dados" class="builder-chips"></div>
+            </div>
+            <div class="builder-bloco">
+              <div class="builder-titulo"><strong>🛡️ Atributos</strong><button type="button" class="btn-pequeno" onclick="adicionarCampoSistema('atributos')">＋ Adicionar</button></div>
+              <div id="builder-atributos" class="builder-lista"></div>
+            </div>
+            <div class="builder-bloco">
+              <div class="builder-titulo"><strong>❤️ Recursos</strong><button type="button" class="btn-pequeno" onclick="adicionarCampoSistema('recursos')">＋ Adicionar</button></div>
+              <div id="builder-recursos" class="builder-lista"></div>
+            </div>
+            <div class="builder-bloco">
+              <div class="builder-titulo"><strong>🎯 Perícias</strong><button type="button" class="btn-pequeno" onclick="adicionarCampoSistema('pericias')">＋ Adicionar</button></div>
+              <div id="builder-pericias" class="builder-lista"></div>
+            </div>
+            <div class="builder-bloco">
+              <div class="builder-titulo"><strong>📜 Campos livres da ficha</strong><button type="button" class="btn-pequeno" onclick="adicionarCampoSistema('campos')">＋ Adicionar</button></div>
+              <div id="builder-campos" class="builder-lista"></div>
+            </div>
           </div>
-          <div class="builder-bloco">
-            <div class="builder-titulo"><strong>❤️ Recursos</strong><button type="button" class="btn-pequeno" onclick="adicionarCampoSistema('recursos')">＋ Adicionar</button></div>
-            <div id="builder-recursos" class="builder-lista"></div>
+
+          <div id="builder-etapa-2" class="builder-etapa-conteudo">
+            <div class="builder-bloco">
+              <div class="builder-titulo"><strong>🧱 Seções da ficha</strong><button type="button" class="btn-pequeno" onclick="adicionarSecaoSistema()">＋ Nova seção</button></div>
+              <p class="builder-ajuda">Crie a ordem visual da ficha. Cada seção pode receber componentes do sistema e uma largura de coluna.</p>
+              <div id="builder-secoes" class="builder-secoes"></div>
+            </div>
           </div>
-          <div class="builder-bloco">
-            <div class="builder-titulo"><strong>🎯 Perícias</strong><button type="button" class="btn-pequeno" onclick="adicionarCampoSistema('pericias')">＋ Adicionar</button></div>
-            <div id="builder-pericias" class="builder-lista"></div>
+
+          <div id="builder-etapa-3" class="builder-etapa-conteudo">
+            <div class="builder-bloco">
+              <div class="builder-titulo"><strong>👁️ Prévia em tempo real</strong><small>Esta é uma aproximação da ficha que os jogadores verão.</small></div>
+              <div id="builder-preview" class="builder-preview"></div>
+            </div>
           </div>
-          <div class="builder-bloco">
-            <div class="builder-titulo"><strong>📜 Campos livres da ficha</strong><button type="button" class="btn-pequeno" onclick="adicionarCampoSistema('campos')">＋ Adicionar</button></div>
-            <div id="builder-campos" class="builder-lista"></div>
-          </div>
+
           <div class="builder-acoes">
             <button onclick="salvarSistema()" class="btn-ficha-principal">⚒️ Salvar Sistema</button>
             <button onclick="fecharNovoSistema()" class="btn-secundario">Cancelar</button>

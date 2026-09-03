@@ -593,10 +593,21 @@ function renderizarListaCampanhas() {
   });
 }
 
-function abrirNovaCampanha() {
+async function abrirNovaCampanha() {
   if (!ehMestreGlobal) return;
   const painel = document.getElementById('painel-nova-campanha');
   if (painel) painel.style.display = 'block';
+  const select = document.getElementById('nova-campanha-sistema');
+  if (select) {
+    select.innerHTML = '<option value="">Carregando sistemas...</option>';
+    const {data,error}=await supabaseClient.from('sistemas').select('id,nome,configuracao').order('nome',{ascending:true});
+    if(error){ select.innerHTML='<option value="">Erro ao carregar sistemas</option>'; console.error(error); }
+    else {
+      select.innerHTML=(data||[]).map(s=>`<option value="${s.id}">${escaparHTML(s.nome)}${s.configuracao?.tipo==='legado'?' — legado':''}</option>`).join('');
+      const preferido=sistemaAtual?.id || (data||[]).find(s=>s.configuracao?.tipo==='legado')?.id || data?.[0]?.id;
+      if(preferido) select.value=preferido;
+    }
+  }
   document.getElementById('nova-campanha-nome')?.focus();
 }
 
@@ -616,13 +627,8 @@ async function criarNovaCampanha() {
   const descricao = descricaoInput?.value.trim() || '';
   if (!nome) return mostrarPopup('❌ Informe o nome da campanha.');
 
-  // Nesta primeira etapa, novas campanhas usam o sistema Camelot legado.
-  // Na Etapa 2, este campo será substituído pelo seletor/construtor de sistemas.
-  let sistemaId = sistemaAtual?.id || campanhasDisponiveis.find(c => c.sistemas?.nome === 'Crônicas de Camelot')?.sistema_id || null;
-  if (!sistemaId) {
-    const { data: sistema } = await supabaseClient.from('sistemas').select('id').ilike('nome', 'Crônicas de Camelot').limit(1).maybeSingle();
-    sistemaId = sistema?.id || null;
-  }
+  const sistemaId = document.getElementById('nova-campanha-sistema')?.value || null;
+  if (!sistemaId) return mostrarPopup('❌ Selecione o sistema RPG da campanha.');
 
   const { data, error } = await supabaseClient
     .from('campanhas')
@@ -645,27 +651,100 @@ async function criarNovaCampanha() {
 
 
 // ==========================================
-// SISTEMAS RPG — ETAPA 2
+// SISTEMAS RPG — ETAPA 3 / CONSTRUTOR VISUAL
 // ==========================================
 const DADOS_DISPONIVEIS_SISTEMA = ['d4','d6','d8','d10','d12','d20','d100'];
+const TIPOS_CAMPO = [
+  {value:'texto',label:'Texto'},
+  {value:'numero',label:'Número'},
+  {value:'area',label:'Texto longo'},
+  {value:'checkbox',label:'Caixa de seleção'}
+];
 const CAMPOS_SISTEMA_PADRAO = {
   atributos: [{nome:'Força', sigla:'FOR'}, {nome:'Destreza', sigla:'DES'}, {nome:'Constituição', sigla:'CON'}],
   recursos: [{nome:'Vida', sigla:'HP', tipo:'numero'}, {nome:'Energia', sigla:'EN', tipo:'numero'}],
   pericias: [{nome:'Percepção', atributo:'FOR'}],
-  campos: [{nome:'História', tipo:'texto'}]
+  campos: [{nome:'História', tipo:'area'}]
 };
-let builderSistema = { dados: [], atributos: [], recursos: [], pericias: [], campos: [] };
+let builderSistema = { dados: [], atributos: [], recursos: [], pericias: [], campos: [], secoes: [] };
+let builderEtapaAtual = 1;
+
+function normalizarCampoBuilder(campo, fallbackTipo='texto') {
+  return {
+    id: campo?.id || ('campo_' + Math.random().toString(36).slice(2,10)),
+    nome: campo?.nome || 'Novo Campo',
+    sigla: campo?.sigla || '',
+    tipo: campo?.tipo || fallbackTipo,
+    atributo: campo?.atributo || '',
+    largura: Number(campo?.largura || 1),
+    obrigatorio: !!campo?.obrigatorio,
+    placeholder: campo?.placeholder || '',
+    valor_padrao: campo?.valor_padrao ?? ''
+  };
+}
+
+function gerarCatalogoCampos() {
+  return [
+    ...builderSistema.atributos.map((x,i)=>({id:x.id||`atributo_${i}`, nome:x.nome, grupo:'Atributo', tipo:'numero'})),
+    ...builderSistema.recursos.map((x,i)=>({id:x.id||`recurso_${i}`, nome:x.nome, grupo:'Recurso', tipo:x.tipo||'numero'})),
+    ...builderSistema.pericias.map((x,i)=>({id:x.id||`pericia_${i}`, nome:x.nome, grupo:'Perícia', tipo:'numero'})),
+    ...builderSistema.campos.map((x,i)=>({id:x.id||`campo_${i}`, nome:x.nome, grupo:'Campo', tipo:x.tipo||'texto'}))
+  ];
+}
+
+function gerarLayoutPadrao() {
+  const catalogo = gerarCatalogoCampos();
+  const porGrupo = g => catalogo.filter(x=>x.grupo===g).map(x=>x.id);
+  return [
+    {id:'sec_identidade', titulo:'Identidade', icone:'📜', colunas:2, campos:[]},
+    {id:'sec_atributos', titulo:'Atributos', icone:'🛡️', colunas:3, campos:porGrupo('Atributo')},
+    {id:'sec_recursos', titulo:'Recursos', icone:'❤️', colunas:3, campos:porGrupo('Recurso')},
+    {id:'sec_pericias', titulo:'Perícias', icone:'🎯', colunas:2, campos:porGrupo('Perícia')},
+    {id:'sec_registro', titulo:'Registro', icone:'📚', colunas:1, campos:porGrupo('Campo')}
+  ];
+}
+
+function normalizarSecao(secao) {
+  return {
+    id: secao?.id || ('sec_' + Math.random().toString(36).slice(2,10)),
+    titulo: secao?.titulo || 'Nova seção',
+    icone: secao?.icone || '◆',
+    colunas: Math.min(4, Math.max(1, Number(secao?.colunas || 1))),
+    campos: Array.isArray(secao?.campos) ? [...secao.campos] : []
+  };
+}
 
 function iniciarBuilderSistema(config = null) {
   const c = config || CAMPOS_SISTEMA_PADRAO;
   builderSistema = {
     dados: Array.isArray(config?.dados) ? [...config.dados] : ['d20'],
-    atributos: Array.isArray(c.atributos) ? c.atributos.map(x=>({...x})) : [],
-    recursos: Array.isArray(c.recursos) ? c.recursos.map(x=>({...x})) : [],
-    pericias: Array.isArray(c.pericias) ? c.pericias.map(x=>({...x})) : [],
-    campos: Array.isArray(c.campos) ? c.campos.map(x=>({...x})) : []
+    atributos: Array.isArray(c.atributos) ? c.atributos.map(x=>normalizarCampoBuilder(x,'numero')) : [],
+    recursos: Array.isArray(c.recursos) ? c.recursos.map(x=>normalizarCampoBuilder(x,x.tipo||'numero')) : [],
+    pericias: Array.isArray(c.pericias) ? c.pericias.map(x=>normalizarCampoBuilder(x,'numero')) : [],
+    campos: Array.isArray(c.campos) ? c.campos.map(x=>normalizarCampoBuilder(x,x.tipo||'texto')) : [],
+    secoes: Array.isArray(config?.secoes) && config.secoes.length ? config.secoes.map(normalizarSecao) : []
   };
+  if (!builderSistema.secoes.length) builderSistema.secoes = gerarLayoutPadrao();
+  sincronizarIdsComLayout();
   renderizarBuilderSistema();
+}
+
+function sincronizarIdsComLayout() {
+  const usados = new Set();
+  ['atributos','recursos','pericias','campos'].forEach(tipo=>builderSistema[tipo].forEach((x,i)=>{
+    if(!x.id || usados.has(x.id)) x.id=`${tipo.slice(0,-1)}_${Date.now().toString(36)}_${i}`;
+    usados.add(x.id);
+  }));
+  const validos = new Set(gerarCatalogoCampos().map(x=>x.id));
+  builderSistema.secoes.forEach(s=>s.campos=s.campos.filter(id=>validos.has(id)));
+}
+
+function mudarEtapaBuilder(etapa) {
+  builderEtapaAtual = etapa;
+  document.querySelectorAll('.builder-etapa').forEach((b,i)=>b.classList.toggle('ativo',i===etapa-1));
+  document.querySelectorAll('.builder-etapa-conteudo').forEach((el,i)=>el.classList.toggle('ativo',i===etapa-1));
+  if(etapa===2) renderizarSecoesBuilder();
+  if(etapa===3) renderizarPreviewBuilder();
 }
 
 function abrirNovoSistema() {
@@ -675,34 +754,86 @@ function abrirNovoSistema() {
   document.getElementById('novo-sistema-nome').value = '';
   document.getElementById('novo-sistema-descricao').value = '';
   iniciarBuilderSistema();
+  mudarEtapaBuilder(1);
   document.getElementById('painel-novo-sistema').style.display = 'block';
   document.getElementById('novo-sistema-nome').focus();
 }
 function fecharNovoSistema() { document.getElementById('painel-novo-sistema').style.display='none'; }
 function escSistema(v){ return escaparHTML(v); }
+
 function renderizarBuilderSistema(){
   const chips=document.getElementById('builder-dados');
   if(chips) chips.innerHTML=DADOS_DISPONIVEIS_SISTEMA.map(d=>`<button type="button" class="builder-chip ${builderSistema.dados.includes(d)?'ativo':''}" onclick="alternarDadoSistema('${d}')">${d}</button>`).join('');
-  renderListaBuilder('atributos','atributo'); renderListaBuilder('recursos','recurso'); renderListaBuilder('pericias','pericia'); renderListaBuilder('campos','campo');
+  renderListaBuilder('atributos'); renderListaBuilder('recursos'); renderListaBuilder('pericias'); renderListaBuilder('campos');
+  sincronizarIdsComLayout();
+  if(builderEtapaAtual===2) renderizarSecoesBuilder();
+  if(builderEtapaAtual===3) renderizarPreviewBuilder();
 }
 function alternarDadoSistema(d){ builderSistema.dados=builderSistema.dados.includes(d)?builderSistema.dados.filter(x=>x!==d):[...builderSistema.dados,d]; renderizarBuilderSistema(); }
 function adicionarCampoSistema(tipo){
-  const defaults={atributos:{nome:'Novo Atributo',sigla:'ATR'},recursos:{nome:'Novo Recurso',sigla:'REC',tipo:'numero'},pericias:{nome:'Nova Perícia',atributo:''},campos:{nome:'Novo Campo',tipo:'texto'}};
-  builderSistema[tipo].push({...defaults[tipo]}); renderizarBuilderSistema();
+  const defaults={atributos:{nome:'Novo Atributo',sigla:'ATR',tipo:'numero'},recursos:{nome:'Novo Recurso',sigla:'REC',tipo:'numero'},pericias:{nome:'Nova Perícia',atributo:'',tipo:'numero'},campos:{nome:'Novo Campo',tipo:'texto'}};
+  builderSistema[tipo].push(normalizarCampoBuilder(defaults[tipo],defaults[tipo].tipo));
+  sincronizarIdsComLayout(); renderizarBuilderSistema();
 }
 function atualizarCampoSistema(tipo,index,chave,valor){ if(builderSistema[tipo]?.[index]) builderSistema[tipo][index][chave]=valor; }
-function removerCampoSistema(tipo,index){ builderSistema[tipo].splice(index,1); renderizarBuilderSistema(); }
-function renderListaBuilder(tipo, classe){
+function removerCampoSistema(tipo,index){
+  const campo=builderSistema[tipo][index];
+  builderSistema[tipo].splice(index,1);
+  if(campo?.id) builderSistema.secoes.forEach(s=>s.campos=s.campos.filter(id=>id!==campo.id));
+  sincronizarIdsComLayout(); renderizarBuilderSistema();
+}
+function moverCampoSistema(tipo,index,direcao){
+  const arr=builderSistema[tipo], novo=index+direcao;
+  if(novo<0||novo>=arr.length)return;
+  [arr[index],arr[novo]]=[arr[novo],arr[index]]; renderizarBuilderSistema();
+}
+function renderListaBuilder(tipo){
   const el=document.getElementById('builder-'+tipo); if(!el) return;
   const lista=builderSistema[tipo];
   if(!lista.length){ el.innerHTML='<div class="estado-galeria">Nenhum campo configurado.</div>'; return; }
   el.innerHTML=lista.map((item,i)=>{
-    if(tipo==='atributos') return `<div class="builder-linha"><input value="${escSistema(item.nome)}" oninput="atualizarCampoSistema('atributos',${i},'nome',this.value)" placeholder="Nome"><input value="${escSistema(item.sigla||'')}" maxlength="8" oninput="atualizarCampoSistema('atributos',${i},'sigla',this.value)" placeholder="Sigla"><button type="button" class="btn-remover-campo" onclick="removerCampoSistema('atributos',${i})">✕</button></div>`;
-    if(tipo==='recursos') return `<div class="builder-linha"><input value="${escSistema(item.nome)}" oninput="atualizarCampoSistema('recursos',${i},'nome',this.value)" placeholder="Nome"><select onchange="atualizarCampoSistema('recursos',${i},'tipo',this.value)"><option value="numero" ${item.tipo==='numero'?'selected':''}>Número</option><option value="texto" ${item.tipo==='texto'?'selected':''}>Texto</option></select><button type="button" class="btn-remover-campo" onclick="removerCampoSistema('recursos',${i})">✕</button></div>`;
-    if(tipo==='pericias') return `<div class="builder-linha"><input value="${escSistema(item.nome)}" oninput="atualizarCampoSistema('pericias',${i},'nome',this.value)" placeholder="Nome"><input value="${escSistema(item.atributo||'')}" oninput="atualizarCampoSistema('pericias',${i},'atributo',this.value)" placeholder="Atributo relacionado"><button type="button" class="btn-remover-campo" onclick="removerCampoSistema('pericias',${i})">✕</button></div>`;
-    return `<div class="builder-linha campo-livre"><input value="${escSistema(item.nome)}" oninput="atualizarCampoSistema('campos',${i},'nome',this.value)" placeholder="Nome do campo"><select onchange="atualizarCampoSistema('campos',${i},'tipo',this.value)"><option value="texto" ${item.tipo==='texto'?'selected':''}>Texto</option><option value="numero" ${item.tipo==='numero'?'selected':''}>Número</option><option value="area" ${item.tipo==='area'?'selected':''}>Texto longo</option></select><button type="button" class="btn-remover-campo" onclick="removerCampoSistema('campos',${i})">✕</button></div>`;
+    const nav=`<div class="builder-movimento"><button type="button" onclick="moverCampoSistema('${tipo}',${i},-1)" ${i===0?'disabled':''}>↑</button><button type="button" onclick="moverCampoSistema('${tipo}',${i},1)" ${i===lista.length-1?'disabled':''}>↓</button></div>`;
+    const obrig=`<label class="builder-check"><input type="checkbox" ${item.obrigatorio?'checked':''} onchange="atualizarCampoSistema('${tipo}',${i},'obrigatorio',this.checked)"> obrigatório</label>`;
+    const tipoSelect=`<select onchange="atualizarCampoSistema('${tipo}',${i},'tipo',this.value)">${TIPOS_CAMPO.map(t=>`<option value="${t.value}" ${item.tipo===t.value?'selected':''}>${t.label}</option>`).join('')}</select>`;
+    const comum=`<input value="${escSistema(item.nome)}" oninput="atualizarCampoSistema('${tipo}',${i},'nome',this.value)" placeholder="Nome">${tipo==='atributos'||tipo==='recursos'?`<input value="${escSistema(item.sigla||'')}" maxlength="8" oninput="atualizarCampoSistema('${tipo}',${i},'sigla',this.value)" placeholder="Sigla">`:''}${tipo==='pericias'?`<input value="${escSistema(item.atributo||'')}" oninput="atualizarCampoSistema('pericias',${i},'atributo',this.value)" placeholder="Atributo relacionado">`:''}${tipo==='recursos'?tipoSelect:''}${tipo==='campos'?tipoSelect:''}`;
+    return `<div class="builder-item-avancado"><div class="builder-linha">${comum}<button type="button" class="btn-remover-campo" onclick="removerCampoSistema('${tipo}',${i})">✕</button></div><div class="builder-opcoes">${obrig}<label>Colunas <select onchange="atualizarCampoSistema('${tipo}',${i},'largura',this.value)"><option value="1" ${Number(item.largura)===1?'selected':''}>1</option><option value="2" ${Number(item.largura)===2?'selected':''}>2</option><option value="3" ${Number(item.largura)===3?'selected':''}>3</option><option value="4" ${Number(item.largura)===4?'selected':''}>4</option></select></label>${nav}</div></div>`;
   }).join('');
 }
+
+function adicionarSecaoSistema(){
+  builderSistema.secoes.push(normalizarSecao({titulo:'Nova seção',icone:'◆',colunas:1,campos:[]}));
+  renderizarSecoesBuilder();
+}
+function removerSecaoSistema(index){ if(builderSistema.secoes.length<=1)return mostrarPopup('⚠️ O sistema precisa ter pelo menos uma seção.'); builderSistema.secoes.splice(index,1); renderizarSecoesBuilder(); }
+function moverSecaoSistema(index,direcao){ const novo=index+direcao; if(novo<0||novo>=builderSistema.secoes.length)return; [builderSistema.secoes[index],builderSistema.secoes[novo]]=[builderSistema.secoes[novo],builderSistema.secoes[index]]; renderizarSecoesBuilder(); }
+function atualizarSecaoSistema(index,chave,valor){ if(builderSistema.secoes[index]) builderSistema.secoes[index][chave]=chave==='colunas'?Number(valor):valor; }
+function alternarCampoSecao(secaoIndex,campoId){
+  const s=builderSistema.secoes[secaoIndex]; if(!s)return;
+  s.campos=s.campos.includes(campoId)?s.campos.filter(x=>x!==campoId):[...s.campos,campoId];
+  renderizarSecoesBuilder();
+}
+function renderizarSecoesBuilder(){
+  const el=document.getElementById('builder-secoes'); if(!el)return;
+  const catalogo=gerarCatalogoCampos();
+  el.innerHTML=builderSistema.secoes.map((s,i)=>`<div class="builder-secao-card">
+    <div class="builder-secao-cabecalho"><div class="builder-secao-titulo"><input class="builder-icone" value="${escSistema(s.icone)}" maxlength="3" oninput="atualizarSecaoSistema(${i},'icone',this.value)"><input value="${escSistema(s.titulo)}" oninput="atualizarSecaoSistema(${i},'titulo',this.value)" placeholder="Título da seção"></div><div class="builder-movimento"><button type="button" onclick="moverSecaoSistema(${i},-1)" ${i===0?'disabled':''}>↑</button><button type="button" onclick="moverSecaoSistema(${i},1)" ${i===builderSistema.secoes.length-1?'disabled':''}>↓</button><button type="button" onclick="removerSecaoSistema(${i})">✕</button></div></div>
+    <div class="builder-secao-opcoes"><label>Colunas <select onchange="atualizarSecaoSistema(${i},'colunas',this.value)">${[1,2,3,4].map(n=>`<option value="${n}" ${s.colunas===n?'selected':''}>${n}</option>`).join('')}</select></label></div>
+    <div class="builder-catalogo-campos">${catalogo.length?catalogo.map(c=>`<label class="builder-campo-toggle"><input type="checkbox" ${s.campos.includes(c.id)?'checked':''} onchange="alternarCampoSecao(${i},'${c.id}')"><span>${escSistema(c.nome)}</span><small>${c.grupo}</small></label>`).join(''):'<span class="texto-vazio">Crie componentes na etapa 1.</span>'}</div>
+  </div>`).join('');
+}
+
+function renderizarPreviewBuilder(){
+  const el=document.getElementById('builder-preview'); if(!el)return;
+  const catalogo=gerarCatalogoCampos();
+  const mapa=new Map(catalogo.map(x=>[x.id,x]));
+  const identidade=`<section class="preview-secao"><h4>📜 Identidade</h4><div class="preview-grid cols-2"><div><label>Nome do Personagem</label><input placeholder="Ex.: Sir Lancelot"></div><div><label>Nível</label><input type="number" placeholder="1"></div></div></section>`;
+  const secoes=builderSistema.secoes.map(s=>`<section class="preview-secao"><h4>${escSistema(s.icone)} ${escSistema(s.titulo)}</h4><div class="preview-grid cols-${s.colunas}">${s.campos.map(id=>{const c=mapa.get(id);if(!c)return '';return `<div class="preview-campo span-${Math.min(4,Number(c.largura||1))}"><label>${escSistema(c.nome)}${c.obrigatorio?' *':''}</label>${c.tipo==='area'?'<textarea rows="3" placeholder="Texto longo..."></textarea>':c.tipo==='checkbox'?'<label class="preview-checkbox"><input type="checkbox"> marcado</label>':`<input type="${c.tipo==='numero'?'number':'text'}" placeholder="${escSistema(c.placeholder||'')}">`}</div>`;}).join('')}</div></section>`).join('');
+  el.innerHTML=`<div class="preview-ficha"><div class="preview-cabecalho"><h3>${escSistema(document.getElementById('novo-sistema-nome')?.value||'Novo Sistema')}</h3><p>Ficha de personagem</p></div>${identidade}${secoes||'<p class="texto-vazio">Nenhuma seção configurada.</p>'}</div>`;
+}
+
+document.addEventListener('input', function(e){
+  if(e.target?.id==='novo-sistema-nome' && builderEtapaAtual===3) renderizarPreviewBuilder();
+});
 
 async function carregarSistemas(){
   if(!supabaseClient) return;
@@ -728,7 +859,8 @@ async function editarSistema(id){
 async function salvarSistema(){
   if(!ehMestreGlobal) return; const nome=document.getElementById('novo-sistema-nome')?.value.trim(); if(!nome)return mostrarPopup('❌ Informe o nome do sistema.');
   const descricao=document.getElementById('novo-sistema-descricao')?.value.trim()||''; const id=document.getElementById('sistema-editando-id')?.value||null;
-  const config={versao:1,tipo:'generico',dados:[...builderSistema.dados],atributos:builderSistema.atributos.map(x=>({...x})),recursos:builderSistema.recursos.map(x=>({...x})),pericias:builderSistema.pericias.map(x=>({...x})),campos:builderSistema.campos.map(x=>({...x})),ficha:'ficha-generica.html'};
+  sincronizarIdsComLayout();
+  const config={versao:2,tipo:'generico',dados:[...builderSistema.dados],atributos:builderSistema.atributos.map(x=>({...x})),recursos:builderSistema.recursos.map(x=>({...x})),pericias:builderSistema.pericias.map(x=>({...x})),campos:builderSistema.campos.map(x=>({...x})),secoes:builderSistema.secoes.map(x=>({...x,campos:[...x.campos]})),ficha:'ficha-generica.html'};
   let q=supabaseClient.from('sistemas'); const payload={nome,descricao,configuracao:config,updated_at:new Date().toISOString()};
   const result=id?await q.update(payload).eq('id',id).select().single():await q.insert({...payload,criado_por:(await supabaseClient.auth.getUser()).data.user?.id}).select().single();
   if(result.error)return mostrarPopup('❌ Erro ao salvar sistema: '+result.error.message);

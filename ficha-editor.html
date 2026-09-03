@@ -699,6 +699,29 @@
         body.modo-edicao #btn-enviar-mesa::after { content: ''; }
         body.modo-visualizacao input, body.modo-visualizacao select, body.modo-visualizacao textarea, body.modo-visualizacao input[type="range"], body.modo-visualizacao input[type="checkbox"] { pointer-events:none; }
         body.modo-visualizacao { padding-top: 8px; }
+
+        /* Polimento mobile e acessibilidade */
+        button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+            outline: 2px solid var(--accent-gold);
+            outline-offset: 2px;
+        }
+        input[type="file"] {
+            max-width: 100%;
+        }
+        @media (max-width: 600px) {
+            body { padding: 6px 4px; }
+            .ficha-container { padding: 10px 8px; border-width: 1px; }
+            h1 { font-size: 1.25em; letter-spacing: 1px; }
+            .subtitulo { font-size: .78em; }
+            button { min-height: 44px; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: .01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: .01ms !important;
+            }
+        }
     </style>
 </head>
 <body>

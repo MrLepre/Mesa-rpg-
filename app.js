@@ -19,6 +19,58 @@ let vttPanX = 0;
 let vttPanY = 0;
 let vttMovimentoLivre = false;
 let mapaModoImersivo = false;
+let audioContext = null;
+
+// --- FEEDBACK SONORO E TÁTIL (sem arquivos externos) ---
+function tocarSom(tipo = 'click') {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    if (!audioContext) audioContext = new AudioCtx();
+    if (audioContext.state === 'suspended') audioContext.resume();
+
+    const config = {
+      click: { freq: 520, duration: 0.045, volume: 0.025, wave: 'sine' },
+      success: { freq: 740, duration: 0.11, volume: 0.035, wave: 'triangle' },
+      dice: { freq: 180, duration: 0.12, volume: 0.04, wave: 'square' },
+      critical: { freq: 980, duration: 0.18, volume: 0.045, wave: 'triangle' },
+      ping: { freq: 620, duration: 0.08, volume: 0.03, wave: 'sine' }
+    }[tipo] || { freq: 520, duration: 0.05, volume: 0.025, wave: 'sine' };
+
+    const now = audioContext.currentTime;
+    const osc = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+    osc.type = config.wave;
+    osc.frequency.setValueAtTime(config.freq, now);
+    if (tipo === 'dice') osc.frequency.exponentialRampToValueAtTime(90, now + config.duration);
+    if (tipo === 'critical') osc.frequency.exponentialRampToValueAtTime(1250, now + config.duration);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(config.volume, now + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + config.duration);
+    osc.connect(gain);
+    gain.connect(audioContext.destination);
+    osc.start(now);
+    osc.stop(now + config.duration + 0.01);
+  } catch (err) {
+    // Áudio é apenas um aprimoramento; nunca deve quebrar a mesa.
+  }
+}
+
+function vibrarPadrao(padrao = [18]) {
+  try {
+    if (navigator.vibrate) navigator.vibrate(padrao);
+  } catch (err) {}
+}
+
+function atualizarStatusConexao(estado, texto) {
+  const status = document.getElementById('status-conexao');
+  const label = document.getElementById('status-conexao-texto');
+  if (!status) return;
+  status.classList.remove('online', 'offline');
+  if (estado === 'online') status.classList.add('online');
+  if (estado === 'offline') status.classList.add('offline');
+  if (label) label.textContent = texto;
+}
 
 // Inicialização segura
 try {
@@ -36,6 +88,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!supabaseClient && window.supabase) {
     supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   }
+
+  atualizarStatusConexao(supabaseClient ? 'online' : 'offline', supabaseClient ? 'Conectando à Távola...' : 'Modo local — Supabase indisponível.');
 
   if (supabaseClient) {
     try {
@@ -77,14 +131,42 @@ document.addEventListener('DOMContentLoaded', async () => {
             false
           );
         })
-        .subscribe();
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') atualizarStatusConexao('online', 'Távola sincronizada');
+          else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') atualizarStatusConexao('offline', 'Sincronização indisponível');
+        });
 
       carregarMapaAtual();
       carregarGaleria();
     } catch (err) {
+      atualizarStatusConexao('offline', 'Erro de conexão');
       console.error('Erro na sessão/conexão:', err);
     }
   }
+});
+
+document.addEventListener('click', (event) => {
+  const alvo = event.target.closest('button');
+  if (alvo && !alvo.disabled) {
+    tocarSom('click');
+    vibrarPadrao([10]);
+  }
+});
+
+document.addEventListener('keydown', (event) => {
+  const tag = document.activeElement?.tagName;
+  const digit = event.key;
+  if (digit === 'Escape') {
+    fecharCriadorFicha();
+    if (typeof fecharModalFichaGrupo === 'function') fecharModalFichaGrupo();
+    const visualizador = document.getElementById('modal-visualizador-img');
+    if (visualizador) visualizador.style.display = 'none';
+    return;
+  }
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
+  const abas = ['ficha', 'grupo', 'mapa', 'rolagens', 'galeria'];
+  const index = Number(digit) - 1;
+  if (index >= 0 && index < abas.length) mudarAba(abas[index]);
 });
 
 window.addEventListener('message', async (event) => {
@@ -149,18 +231,6 @@ async function fazerLogin() {
     password: password
   });
 
-  if (authResult.error && nick.toLowerCase() === 'mestre' && password === '123456') {
-    await supabaseClient.auth.signUp({
-      email: emailFake,
-      password: password,
-      options: { data: { display_name: 'Mestre' } }
-    });
-    authResult = await supabaseClient.auth.signInWithPassword({
-      email: emailFake,
-      password: password
-    });
-  }
-
   if (authResult.error) {
     mostrarPopup('❌ Nick ou senha incorretos.');
   } else {
@@ -197,7 +267,7 @@ function atualizarInterfaceAuth(user) {
     const nickDisplay = document.getElementById('user-nick-display');
     if (nickDisplay) nickDisplay.innerText = nickExibicao;
 
-    ehMestreGlobal = nickExibicao.toLowerCase() === 'mestre';
+    ehMestreGlobal = (user.email || '').toLowerCase() === 'mestre@rpg.local';
     if (ehMestreGlobal) {
       if (badgeMestre) badgeMestre.style.display = 'inline-block';
       if (painelMapaMestre) painelMapaMestre.style.display = 'block';
@@ -427,7 +497,7 @@ async function carregarFichasDoGrupo() {
     
     const infoDiv = document.createElement('div');
     const nomeCavaleiro = item.nome_personagem || 'Cavaleiro Desconhecido';
-    infoDiv.innerHTML = `<strong style="color: #fff; font-size: 1.1rem;">${nomeCavaleiro}</strong>`;
+    infoDiv.innerHTML = `<strong style="color: #fff; font-size: 1.1rem;">${escaparHTML(nomeCavaleiro)}</strong>`;
     
     const acoesDiv = document.createElement('div');
     acoesDiv.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;';
@@ -478,7 +548,10 @@ async function fazerUploadMapa() {
   if (!input.files || input.files.length === 0) return alert('Selecione uma imagem para o mapa!');
 
   const file = input.files[0];
-  const fileName = `mapa_${Date.now()}.${file.name.split('.').pop()}`;
+  if (!file.type.startsWith('image/')) return mostrarPopup('❌ O mapa precisa ser uma imagem.');
+  if (file.size > 12 * 1024 * 1024) return mostrarPopup('❌ O mapa deve ter no máximo 12 MB.');
+  const extensao = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const fileName = `mapa_${Date.now()}_${crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)}.${extensao}`;
 
   const { error } = await supabaseClient.storage
     .from('galeria')
@@ -551,7 +624,7 @@ function exibirMapaNaTela(url) {
     
     <div id="vtt-canvas" class="vtt-wrapper" style="overflow: hidden; position: relative; width: 100%; height: ${alturaMapa}; border: 1px solid #29292e; border-radius: 6px; background: #0b0d12; display: flex; justify-content: center; align-items: center; touch-action: none; cursor: ${ehMestreGlobal && vttMovimentoLivre ? 'grab' : 'crosshair'}; transition: height 0.3s ease;">
       <div id="vtt-mapa-scaler" style="position: relative; width: 100%; transform: translate(${vttPanX}px, ${vttPanY}px) scale(${vttZoom / 100}); transform-origin: center center; transition: transform 0.05s ease-out; display: flex; justify-content: center; align-items: center;">
-        <img src="${url}" class="vtt-mapa-img" alt="Mapa Tático" style="width: 100%; display: block; height: auto; pointer-events: none;">
+        <img src="${escaparHTML(url)}" class="vtt-mapa-img" alt="Mapa Tático" decoding="async" fetchpriority="high" style="width: 100%; display: block; height: auto; pointer-events: none;">
         <div id="vtt-grid-camada" class="vtt-grid ${gridAtivo ? 'ativo' : ''}" style="background-size: ${vttGridTamanho}px ${vttGridTamanho}px; position: absolute; top:0; left:0; width:100%; height:100%; pointer-events: none;"></div>
         <div id="vtt-tokens-camada" style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events: none;"></div>
       </div>
@@ -705,6 +778,8 @@ function darPingNoMapa(event) {
 }
 
 function criarEfeitoPing(x, y) {
+  tocarSom('ping');
+  vibrarPadrao([12]);
   const canvas = document.getElementById('vtt-canvas');
   if (!canvas) return;
 
@@ -960,6 +1035,8 @@ function ativarArrastoToken(token, id, nome, tamanho, imagem, hpAtual, hpMax) {
 
 // --- ROLAGENS DE DADOS ---
 function rolarDado(lados) {
+  tocarSom('dice');
+  vibrarPadrao([22]);
   const resultado = Math.floor(Math.random() * lados) + 1;
   const userNick = document.getElementById('user-nick-display')?.innerText || 'Jogador';
   const descricao = `${userNick} rolou d${lados}`;
@@ -974,10 +1051,13 @@ function rolarDado(lados) {
   }
 
   const textoResultado = `${descricao}: ${resultado}${mensagemExtra}`;
+  if (lados === 20 && resultado === 20) tocarSom('critical');
   registrarRolagemHistorico(descricao, textoResultado, false);
 }
 
 function rolarExpressaoPersonalizada() {
+  tocarSom('dice');
+  vibrarPadrao([22]);
   const exprInput = document.getElementById('expressao-dado');
   if (!exprInput) return;
   const expr = exprInput.value.trim();
@@ -991,6 +1071,9 @@ function rolarExpressaoPersonalizada() {
     const qtd = match[1] ? parseInt(match[1]) : 1;
     const lados = parseInt(match[2]);
     const modificador = match[3] ? parseInt(match[3]) : 0;
+    if (qtd < 1 || qtd > 100 || lados < 2 || lados > 1000 || Math.abs(modificador) > 10000) {
+      return mostrarPopup('❌ Limites da rolagem: até 100 dados, d2–d1000 e modificador de ±10000.');
+    }
 
     let soma = 0;
     let lancamentos = [];
@@ -1018,14 +1101,17 @@ function registrarRolagemHistorico(descricao, resultado, veioDoBroadcast = false
   if (historico.querySelector('p')) historico.innerHTML = '';
 
   const item = document.createElement('div');
-  item.style.cssText = 'background: #202024; padding: 0.5rem 0.8rem; border-radius: 4px; margin-bottom: 0.4rem; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid #8257e5; font-size: 0.9rem;';
-  
+  item.style.cssText = 'background: #202024; padding: 0.5rem 0.8rem; border-radius: 4px; margin-bottom: 0.4rem; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid #8257e5; font-size: 0.9rem; gap: 12px;';
+
   const textoRes = typeof resultado === 'string' ? resultado : `${descricao} = ${resultado}`;
-  item.innerHTML = `
-    <span style="color: #a8a8b3;">${descricao}</span>
-    <strong style="color: #04d361; font-size: 1.1rem;">${textoRes}</strong>
-  `;
-  
+  const descricaoEl = document.createElement('span');
+  descricaoEl.style.color = '#a8a8b3';
+  descricaoEl.textContent = descricao;
+  const resultadoEl = document.createElement('strong');
+  resultadoEl.style.cssText = 'color: #04d361; font-size: 1.1rem;';
+  resultadoEl.textContent = textoRes;
+  item.append(descricaoEl, resultadoEl);
+
   historico.prepend(item);
   mostrarPopup(`🎲 ${textoRes}`);
 
@@ -1047,7 +1133,10 @@ async function fazerUploadImagem() {
   const categoria = categoriaSelect ? categoriaSelect.value : 'Outros';
 
   const file = input.files[0];
-  const fileName = `galeria_${Date.now()}.${file.name.split('.').pop()}`;
+  if (!file.type.startsWith('image/')) return mostrarPopup('❌ Selecione um arquivo de imagem.');
+  if (file.size > 8 * 1024 * 1024) return mostrarPopup('❌ A imagem deve ter no máximo 8 MB.');
+  const extensao = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const fileName = `galeria_${Date.now()}_${crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)}.${extensao}`;
 
   const { error } = await supabaseClient.storage.from('galeria').upload(fileName, file);
   if (error) return alert('Erro no upload: ' + error.message);
@@ -1063,6 +1152,7 @@ async function fazerUploadImagem() {
 
   if (dbError) return alert('Erro ao salvar no banco: ' + dbError.message);
 
+  tocarSom('success');
   mostrarPopup('🖼️ Imagem enviada com sucesso!');
   carregarGaleria();
 }
@@ -1094,7 +1184,7 @@ async function carregarGaleria() {
           const card = document.createElement('div');
           card.style.cssText = 'background: #202024; border: 1px solid #29292e; border-radius: 6px; overflow: hidden; cursor: pointer;';
           card.innerHTML = `
-            <img src="${img.url}" alt="${img.categoria}" style="width: 100%; height: 90px; object-fit: cover; display: block;" onerror="this.src='https://via.placeholder.com/120?text=Erro'">
+            <img loading="lazy" decoding="async" src="${escaparHTML(img.url)}" alt="${escaparHTML(img.categoria)}" style="width: 100%; height: 90px; object-fit: cover; display: block;" onerror="this.src='https://via.placeholder.com/120?text=Erro'">
           `;
           card.onclick = () => abrirVisualizadorImagem(img.url, img.categoria);
           container.appendChild(card);
@@ -1114,7 +1204,7 @@ async function carregarGaleria() {
         const card = document.createElement('div');
         card.style.cssText = 'background: #202024; border: 1px solid #29292e; border-radius: 6px; overflow: hidden; cursor: pointer;';
         card.innerHTML = `
-          <img src="${img.url}" alt="${img.categoria}" style="width: 100%; height: 110px; object-fit: cover; display: block;" onerror="this.src='https://via.placeholder.com/150?text=Erro'">
+          <img loading="lazy" decoding="async" src="${escaparHTML(img.url)}" alt="${escaparHTML(img.categoria)}" style="width: 100%; height: 110px; object-fit: cover; display: block;" onerror="this.src='https://via.placeholder.com/150?text=Erro'">
           <div style="padding: 0.3rem; font-size: 0.75rem; color: #04d361; text-align: center; background: #121214;">[${img.categoria}]</div>
         `;
         card.onclick = () => abrirVisualizadorImagem(img.url, img.categoria);
@@ -1189,7 +1279,11 @@ function mostrarPopup(texto) {
 
   const toast = document.createElement('div');
   toast.style.cssText = 'background: #18181b; color: #fff; border: 1px solid #8257e5; padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; align-items: center; gap: 8px;';
-  toast.innerHTML = `<span>⚔️</span> <span>${texto}</span>`;
+  const icone = document.createElement('span');
+  icone.textContent = '⚔️';
+  const mensagem = document.createElement('span');
+  mensagem.textContent = texto;
+  toast.append(icone, mensagem);
   container.appendChild(toast);
 
   setTimeout(() => {
@@ -1230,3 +1324,4 @@ window.rolarExpressaoPersonalizada = rolarExpressaoPersonalizada;
 window.fazerUploadImagem = fazerUploadImagem;
 window.alternarMovimentoMapa = alternarMovimentoMapa;
 window.alternarModoImersivoMapa = alternarModoImersivoMapa;
+window.tocarSom = tocarSom;

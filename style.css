@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap');
-
 :root {
   --cam-bg: #07090f;
   --cam-panel: #10141f;
@@ -357,4 +355,171 @@ input:focus, select:focus, textarea:focus {
   }
   .modal-ficha-cabecalho { min-height:48px; }
   .modal-ficha-cabecalho h2 { font-size:.82rem; }
+}
+
+
+/* ==========================================================
+   POLIMENTO — CRÔNICAS DE CAMELOT
+   Camada visual adicional; preserva o comportamento do VTT.
+   ========================================================== */
+:root {
+  --cam-gold-rgb: 212, 175, 55;
+  --cam-success: #5fcf82;
+  --cam-danger: #d45b5b;
+  --cam-shadow: 0 14px 36px rgba(0,0,0,.45);
+}
+
+html { scroll-behavior: smooth; }
+body {
+  background-image:
+    radial-gradient(circle at 50% -10%, rgba(39,59,99,.42), transparent 55%),
+    radial-gradient(circle at 100% 100%, rgba(212,175,55,.07), transparent 35%),
+    linear-gradient(rgba(255,255,255,.012) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.009) 1px, transparent 1px);
+  background-size: auto, auto, 34px 34px, 34px 34px;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  opacity: .16;
+  background-image: radial-gradient(rgba(255,255,255,.22) .5px, transparent .5px);
+  background-size: 5px 5px;
+  mix-blend-mode: screen;
+}
+
+.topo-mesa {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: linear-gradient(180deg, rgba(16,20,31,.98), rgba(10,13,21,.97));
+  box-shadow: 0 8px 24px rgba(0,0,0,.32);
+}
+.topo-mesa h1 {
+  font-size: clamp(1.05rem, 2vw, 1.55rem);
+  line-height: 1.15;
+}
+.topo-mesa h1::before { content: "⚔ "; color: var(--cam-gold); }
+
+.abas-navegacao {
+  position: sticky;
+  top: 77px;
+  z-index: 999;
+  scrollbar-width: none;
+  background: rgba(12,16,26,.96);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 6px 18px rgba(0,0,0,.2);
+}
+.abas-navegacao::-webkit-scrollbar { display:none; }
+.abas-navegacao button { white-space: nowrap; min-height: 40px; }
+.abas-navegacao button.ativo { box-shadow: inset 0 -2px 0 var(--cam-gold), 0 0 12px rgba(var(--cam-gold-rgb),.08); }
+
+main { width: min(1500px, 100%); margin: 0 auto; }
+.painel > h2 {
+  margin: .25rem 0 1rem;
+  padding-bottom: .65rem;
+  border-bottom: 1px solid var(--cam-border);
+}
+.card-secao, .painel > div[style*="background: #202024"] {
+  box-shadow: var(--cam-shadow);
+}
+.card-secao:hover { border-color: rgba(var(--cam-gold-rgb),.55); }
+
+button, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--cam-gold-light);
+  outline-offset: 2px;
+}
+button:disabled { opacity: .55; cursor: not-allowed; transform: none !important; }
+
+.btn-secundario { background: linear-gradient(135deg,#202b42,#111827) !important; }
+.btn-perigo { background: linear-gradient(135deg,#6d2929,#3b1717) !important; color:#fff !important; border-color:#b94a4a !important; }
+.btn-sair { padding: 6px 10px !important; }
+
+.status-conexao {
+  position: fixed;
+  left: 14px;
+  bottom: 14px;
+  z-index: 9997;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  border: 1px solid var(--cam-border);
+  border-radius: 999px;
+  background: rgba(8,10,15,.88);
+  color: #bdb7aa;
+  font-size: .78rem;
+  box-shadow: 0 6px 18px rgba(0,0,0,.35);
+  backdrop-filter: blur(8px);
+  transition: opacity .25s ease, transform .25s ease;
+}
+.status-ponto { width:8px; height:8px; border-radius:50%; background:#d6a83d; box-shadow:0 0 8px rgba(214,168,61,.7); }
+.status-conexao.online .status-ponto { background:#5fcf82; box-shadow:0 0 8px rgba(95,207,130,.8); }
+.status-conexao.offline .status-ponto { background:#d45b5b; box-shadow:0 0 8px rgba(212,91,91,.7); }
+
+.toast {
+  min-width: min(320px, calc(100vw - 28px));
+  max-width: 440px;
+  animation: toastIn .35s cubic-bezier(.2,.8,.2,1);
+}
+@keyframes toastIn { from { transform: translateY(8px) translateX(16px); opacity:0; } to { transform:none; opacity:1; } }
+
+.vtt-wrapper { min-height: 280px; box-shadow: inset 0 0 30px rgba(0,0,0,.9), 0 12px 30px rgba(0,0,0,.35); }
+.vtt-token { will-change: left, top; }
+.vtt-ping { will-change: transform, opacity; }
+
+#galeria-grid > div, #historico-rolagens > div { transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+#galeria-grid > div:hover, #historico-rolagens > div:hover { transform: translateY(-2px); border-color: var(--cam-gold) !important; box-shadow: 0 8px 20px rgba(0,0,0,.3); }
+#galeria-grid img { background: #0b0d12; }
+
+.texto-vazio { color:#a8a8b3; }
+
+/* Inputs de arquivo ficam mais amigáveis no celular */
+input[type="file"] { width: 100%; min-height: 44px; padding: .45rem; }
+input[type="file"]::file-selector-button {
+  margin-right: .7rem;
+  padding: .45rem .7rem;
+  border: 1px solid var(--cam-gold-dark);
+  border-radius: 4px;
+  background: #151d2d;
+  color: var(--cam-gold-light);
+  font-family: 'Cinzel', serif;
+  cursor: pointer;
+}
+
+/* Área de toque confortável */
+@media (pointer: coarse) {
+  button { min-height: 44px; }
+  .abas-navegacao button { min-height: 44px; }
+  input, select, textarea { min-height: 44px; }
+}
+
+@media (max-width: 768px) {
+  .topo-mesa { position: relative; padding: .8rem .75rem; }
+  .auth-container, .form-login { width:100%; }
+  .form-login { display:grid; grid-template-columns: 1fr 1fr; }
+  .form-login input:first-child { grid-column: 1 / -1; }
+  .form-login button { width:100%; }
+  #status-usuario { width:100%; justify-content:space-between; flex-wrap:wrap; }
+  .abas-navegacao { top:0; padding:6px; }
+  main { padding: .75rem; }
+  .card-secao { padding: .9rem; }
+  .status-conexao { left:50%; transform:translateX(-50%); bottom:8px; }
+  #toast-container { left: 10px !important; right: 10px !important; top: 10px !important; align-items: stretch; }
+  .toast { width:100%; min-width:0; max-width:none; }
+}
+
+@media (max-width: 480px) {
+  .abas-navegacao { gap:4px; }
+  .abas-navegacao button { padding: .5rem .7rem; font-size:.75rem; }
+  .painel > h2 { font-size:1.05rem !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }

@@ -696,6 +696,7 @@
             }
         }
         body.modo-visualizacao .botoes-topo { display:none !important; }
+        body.modo-edicao #btn-enviar-mesa::after { content: ''; }
         body.modo-visualizacao input, body.modo-visualizacao select, body.modo-visualizacao textarea, body.modo-visualizacao input[type="range"], body.modo-visualizacao input[type="checkbox"] { pointer-events:none; }
         body.modo-visualizacao { padding-top: 8px; }
     </style>
@@ -705,7 +706,7 @@
 <div class="ficha-container" id="ficha-para-pdf">
     <header>
         <h1>Crônicas de Camelot</h1>
-        <div class="subtitulo">Registros Oficiais da Távola Redonda — Nível 3</div>
+        <div class="subtitulo">Registros Oficiais da Távola Redonda — <span id="subtitulo-nivel">Nível 3</span></div>
         <div class="botoes-topo">
             <button onclick="salvarLocal()">📜 Selar Ficha</button>
             <button onclick="carregarLocal()">📖 Abrir Ficha</button>
@@ -750,6 +751,27 @@
         <div class="campo-texto">
             <label>Título de Glória / Epíteto</label>
             <input type="text" id="titulo" placeholder="Ex: O Cavaleiro da Oculta Floresta">
+        </div>
+    </div>
+
+    <!-- Progressão do Personagem -->
+    <div class="bloco" style="margin-bottom: 20px;">
+        <div class="bloco-header-flex">
+            <h2>📈 Progressão do Cavaleiro</h2>
+            <span style="font-family: 'Cinzel', serif; color: var(--border-gold-light); font-size: 0.75em;">Registro de evolução</span>
+        </div>
+        <div class="grid-dados-gerais" style="margin-bottom: 0;">
+            <div class="campo-texto">
+                <label>Nível Atual</label>
+                <input type="number" id="nivel" value="3" min="1" max="20" onchange="atualizarNivelFicha()">
+            </div>
+            <div class="campo-texto">
+                <label>Experiência (XP)</label>
+                <input type="number" id="xp_atual" value="0" min="0" step="1" onchange="atualizarProgressaoFicha()">
+            </div>
+        </div>
+        <div style="margin-top: 10px; padding: 8px 10px; border: 1px solid #4a3d24; background: var(--input-bg); border-radius: 4px; color: var(--border-gold-light); font-size: 0.82em;">
+            💡 O XP é um registro livre da campanha. As regras e metas de experiência podem ser definidas pelo Mestre sem alterar os demais cálculos da ficha.
         </div>
     </div>
 
@@ -1133,6 +1155,25 @@ function atualizarPorcentagemEnergia(valor) {
     document.getElementById('label_porcentagem_valor').innerText = valor;
 }
 
+function atualizarNivelFicha() {
+    const nivelEl = document.getElementById('nivel');
+    if (!nivelEl) return;
+    let nivel = parseInt(nivelEl.value) || 1;
+    nivel = Math.max(1, Math.min(20, nivel));
+    nivelEl.value = nivel;
+    const subtitulo = document.getElementById('subtitulo-nivel');
+    if (subtitulo) subtitulo.innerText = `Nível ${nivel}`;
+}
+
+function atualizarProgressaoFicha() {
+    const xpEl = document.getElementById('xp_atual');
+    if (xpEl) {
+        const xp = Math.max(0, parseInt(xpEl.value) || 0);
+        xpEl.value = xp;
+    }
+    atualizarNivelFicha();
+}
+
 function calcularTudo() {
     const forca = parseInt(document.getElementById('attr_forca').value) || 0;
     const agilidade = parseInt(document.getElementById('attr_agilidade').value) || 0;
@@ -1178,7 +1219,7 @@ function gerarPDF() {
 }
 
 const listaCamposFixos = [
-    'nome', 'tipo_humano', 'antecedente', 'titulo',
+    'nome', 'tipo_humano', 'antecedente', 'titulo', 'nivel', 'xp_atual',
     'historia_origem', 'historia_motivacao',
     'aparencia_civil', 'input_civil_base64',
     'aparencia_armadura', 'input_armadura_base64',
@@ -1241,6 +1282,7 @@ function carregarDadosFicha(dados) {
     calcularTudo();
     atualizarElementos();
     atualizarOrigemPericias();
+    atualizarProgressaoFicha();
 }
 
 function salvarLocal() {
@@ -1294,13 +1336,16 @@ window.onload = function() {
     calcularTudo();
     atualizarElementos();
     atualizarPorcentagemEnergia(document.getElementById('energia_porcentagem').value);
+    atualizarProgressaoFicha();
     inicializarIntegracaoMesa();
 };
 
 function enviarFichaParaMesa() {
     try {
         const dados = obterDadosFicha();
-        window.parent.postMessage({ type: 'cronicas-camelot-ficha-pronta', dados: dados }, window.location.origin);
+        const params = new URLSearchParams(window.location.search);
+        const modo = params.get('modo') || 'criacao';
+        window.parent.postMessage({ type: 'cronicas-camelot-ficha-pronta', dados: dados, modo: modo }, window.location.origin);
     } catch (err) {
         alert('Não foi possível enviar a ficha para a mesa.');
         console.error(err);
@@ -1309,14 +1354,25 @@ function enviarFichaParaMesa() {
 
 function inicializarIntegracaoMesa() {
     const params = new URLSearchParams(window.location.search);
-    const visualizacao = params.get('modo') === 'visualizacao';
+    const modo = params.get('modo') || 'criacao';
+    const visualizacao = modo === 'visualizacao';
+    const edicao = modo === 'edicao';
     if (visualizacao) document.body.classList.add('modo-visualizacao');
+    if (edicao) {
+        document.body.classList.add('modo-edicao');
+        const botaoEnviar = document.getElementById('btn-enviar-mesa');
+        if (botaoEnviar) botaoEnviar.innerText = '💾 Salvar Alterações na Mesa';
+    }
 
     window.addEventListener('message', function(event) {
         if (event.origin !== window.location.origin) return;
         if (!event.data || event.data.type !== 'cronicas-camelot-carregar-ficha') return;
         if (event.data.dados) {
             carregarDadosFicha(event.data.dados);
+            if (edicao) {
+                const botaoEnviar = document.getElementById('btn-enviar-mesa');
+                if (botaoEnviar) botaoEnviar.innerText = '💾 Salvar Alterações na Mesa';
+            }
             if (visualizacao) {
                 setTimeout(() => {
                     document.querySelectorAll('input, select, textarea, button').forEach(el => { el.disabled = true; });

@@ -1,0 +1,12 @@
+WORLD TRIGGER RPG — TRIGGERS NA FICHA E NO MAPA
+
+Implementação:
+- A ficha World Trigger possui seleção visual por caixas de seleção.
+- O VTT usa 8 espaços de Trigger: 4 no lado principal + 4 no lado secundário.
+- Esse limite de 8 slots é uma decisão de implementação do VTT; o PDF Guia do Agente — RPG de Trion não informa explicitamente a quantidade de slots.
+- Bail Out é tratado como recurso especial de retirada e não ocupa um dos 8 espaços.
+- A ficha salva wt_triggers_ativos e wt_trigger_slots.
+- O mapa lê os Triggers da ficha do jogador atual.
+- Bagworm e Chameleon só aparecem como controles se estiverem equipados na ficha.
+- Os demais Triggers equipados aparecem como opções no painel tático, com seu custo. A mecânica individual desses Triggers será conectada ao módulo de combate posteriormente.
+- O token transmite seu loadout para os demais clientes, sem conceder a eles controles do loadout do outro jogador.

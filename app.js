@@ -35,17 +35,40 @@ let worldTriggerEstado = {
   meuSquad: '',
   bagworm: false,
   chameleon: false,
+  triggersAtivos: [],
   scans: {},
   tokens: {}
 };
 
+function obterConfiguracaoSistemaAtualWT() {
+  const bruto = sistemaAtual?.configuracao;
+  if (!bruto) return null;
+  if (typeof bruto === 'object') return bruto;
+  if (typeof bruto === 'string') {
+    try { return JSON.parse(bruto); } catch (err) { return null; }
+  }
+  return null;
+}
+
 function worldTriggerAtivo() {
-  return sistemaAtual?.configuracao?.tipo === 'world_trigger';
+  const cfg = obterConfiguracaoSistemaAtualWT();
+  const nome = String(sistemaAtual?.nome || '').trim().toLowerCase();
+
+  // Compatibilidade com sistemas salvos antes da implantação do campo
+  // configuracao.tipo. O nome do sistema continua sendo uma identificação
+  // segura para esta ativação enquanto a campanha estiver vinculada a ele.
+  if (cfg?.tipo === 'world_trigger') return true;
+  if (nome.includes('world trigger')) return true;
+
+  // Também reconhece uma configuração que tenha os módulos característicos
+  // do sistema, mesmo que o tipo tenha sido perdido em uma migração antiga.
+  const mod = cfg?.modulos || {};
+  return !!(mod.trion?.ativo && mod.triggers?.ativo && mod.radar?.ativo);
 }
 
 function carregarEstadoWorldTrigger() {
   if (!worldTriggerAtivo()) {
-    worldTriggerEstado = { meuSquad:'', bagworm:false, chameleon:false, scans:{}, tokens:{} };
+    worldTriggerEstado = { meuSquad:'', bagworm:false, chameleon:false, triggersAtivos:[], scans:{}, tokens:{} };
     return;
   }
   try {
@@ -55,11 +78,12 @@ function carregarEstadoWorldTrigger() {
       meuSquad: String(salvo.meuSquad || ''),
       bagworm: !!salvo.bagworm,
       chameleon: !!salvo.chameleon,
+      triggersAtivos: Array.isArray(salvo.triggersAtivos) ? salvo.triggersAtivos.map(String) : [],
       scans: salvo.scans || {},
       tokens: {}
     };
   } catch (err) {
-    worldTriggerEstado = { meuSquad:'', bagworm:false, chameleon:false, scans:{}, tokens:{} };
+    worldTriggerEstado = { meuSquad:'', bagworm:false, chameleon:false, triggersAtivos:[], scans:{}, tokens:{} };
   }
 }
 
@@ -71,6 +95,7 @@ function salvarEstadoWorldTrigger() {
       meuSquad: worldTriggerEstado.meuSquad,
       bagworm: worldTriggerEstado.bagworm,
       chameleon: worldTriggerEstado.chameleon,
+      triggersAtivos: worldTriggerEstado.triggersAtivos,
       scans: worldTriggerEstado.scans
     }));
   } catch (err) {}
@@ -127,6 +152,57 @@ function atualizarRadarWorldTrigger() {
   }).join('');
 }
 
+function normalizarTriggersFichaWT(dados){
+  if(!dados) return [];
+  if(Array.isArray(dados.wt_triggers_ativos)) return dados.wt_triggers_ativos.map(String).filter(Boolean);
+  if(typeof dados.wt_triggers_ativos==='string') return dados.wt_triggers_ativos.split(/[,;\n|]+/).map(x=>x.trim()).filter(Boolean);
+  if(typeof dados.triggers_equipados==='string') return dados.triggers_equipados.split(/[,;\n|]+/).map(x=>x.trim()).filter(Boolean);
+  return [];
+}
+async function carregarTriggersDaFichaWorldTrigger(){
+  if(!worldTriggerAtivo() || !supabaseClient) return [];
+  const atuais=normalizarTriggersFichaWT(dadosFichaAtual);
+  if(atuais.length){
+    worldTriggerEstado.triggersAtivos=atuais;
+    salvarEstadoWorldTrigger();
+    return atuais;
+  }
+  try{
+    const {data}=await supabaseClient.auth.getSession();
+    const uid=data?.session?.user?.id;
+    if(!uid || !obterCampanhaIdAtual()) return [];
+    const {data:ficha,error}=await supabaseClient.from('fichas').select('dados_ficha').eq('user_id',uid).eq('campanha_id',obterCampanhaIdAtual()).maybeSingle();
+    if(error || !ficha?.dados_ficha) return [];
+    const triggers=normalizarTriggersFichaWT(ficha.dados_ficha);
+    if(triggers.length) dadosFichaAtual=ficha.dados_ficha;
+    worldTriggerEstado.triggersAtivos=triggers;
+    salvarEstadoWorldTrigger();
+    return triggers;
+  }catch(err){ console.warn('Não foi possível carregar os Triggers da ficha:',err); return []; }
+}
+function obterDefinicaoTriggerWT(nome){
+  const arsenal=obterConfiguracaoSistemaAtualWT()?.arsenal||{};
+  const todos=[...(arsenal.atacantes||[]),...(arsenal.armeiros||[]),...(arsenal.snipers||[]),...(arsenal.opcionais||[])];
+  return todos.find(t=>String(t.nome||'').toLowerCase()===String(nome||'').toLowerCase())||null;
+}
+function renderizarTriggersAtivosNoMapa(){
+  const triggers=worldTriggerEstado.triggersAtivos||[];
+  if(!triggers.length) return `<div class="wt-sem-triggers">⚠️ Nenhum Trigger equipado na ficha. Abra sua ficha e selecione seus Triggers.</div>`;
+  return `<div class="wt-triggers-mapa"><strong>⚔️ Triggers da sua ficha</strong><div class="wt-triggers-mapa-lista">${triggers.map(nome=>{
+    const t=obterDefinicaoTriggerWT(nome); const custo=t?.custo??t?.custoBase??'—';
+    const n=escaparHTML(nome);
+    if(String(nome).toLowerCase()==='bagworm') return `<button type="button" class="wt-trigger-btn ${worldTriggerEstado.bagworm?'ativo':''}" onclick="alternarBagwormWorldTrigger()">👻 ${n}${worldTriggerEstado.bagworm?' · ATIVO':''}</button>`;
+    if(String(nome).toLowerCase()==='chameleon') return `<button type="button" class="wt-trigger-btn ${worldTriggerEstado.chameleon?'ativo':''}" onclick="alternarChameleonWorldTrigger()">🫥 ${n}${worldTriggerEstado.chameleon?' · ATIVO':''}</button>`;
+    return `<button type="button" class="wt-trigger-btn" onclick="usarTriggerWorldTrigger('${n}')">⚔️ ${n}<small>Custo ${escaparHTML(custo)}</small></button>`;
+  }).join('')}</div></div>`;
+}
+function usarTriggerWorldTrigger(nome){
+  if(!worldTriggerAtivo()) return;
+  if(!(worldTriggerEstado.triggersAtivos||[]).some(x=>String(x).toLowerCase()===String(nome).toLowerCase())) return mostrarPopup('⚠️ Esse Trigger não está equipado na sua ficha.');
+  const t=obterDefinicaoTriggerWT(nome); const custo=t?.custo??t?.custoBase??'—';
+  mostrarPopup(`⚔️ ${nome} está equipado. Custo: ${custo}. A mecânica específica desse Trigger será aplicada pelo módulo de combate.`);
+}
+
 function renderizarPainelWorldTrigger() {
   if (!worldTriggerAtivo()) return '';
   return `
@@ -138,11 +214,10 @@ function renderizarPainelWorldTrigger() {
       <div class="wt-mesa-controles">
         <label>Squad <input id="wt-meu-squad" type="text" maxlength="40" placeholder="Ex.: A-01" value="${escaparHTML(worldTriggerEstado.meuSquad || '')}"></label>
         <button type="button" onclick="salvarSquadWorldTrigger()">💾 Squad</button>
-        <button type="button" class="wt-toggle ${worldTriggerEstado.bagworm ? 'ativo' : ''}" onclick="alternarBagwormWorldTrigger()">👻 Bagworm</button>
-        <button type="button" class="wt-toggle ${worldTriggerEstado.chameleon ? 'ativo' : ''}" onclick="alternarChameleonWorldTrigger()">🫥 Chameleon</button>
         <button type="button" onclick="scanWorldTrigger()">📡 Scan</button>
         <button type="button" onclick="analysisWorldTrigger()">🔎 Analysis</button>
       </div>
+      ${renderizarTriggersAtivosNoMapa()}
       <div class="wt-radar-lista" id="wt-radar-lista"><div class="wt-radar-vazio">Aguardando sinais...</div></div>
     </div>`;
 }
@@ -157,6 +232,7 @@ function salvarSquadWorldTrigger() {
 
 function alternarBagwormWorldTrigger() {
   if (!worldTriggerAtivo()) return;
+  if (!(worldTriggerEstado.triggersAtivos || []).some(x => String(x).toLowerCase() === 'bagworm')) return mostrarPopup('⚠️ Bagworm não está equipado na sua ficha.');
   worldTriggerEstado.bagworm = !worldTriggerEstado.bagworm;
   if (worldTriggerEstado.bagworm) worldTriggerEstado.chameleon = false;
   salvarEstadoWorldTrigger();
@@ -167,6 +243,7 @@ function alternarBagwormWorldTrigger() {
 
 function alternarChameleonWorldTrigger() {
   if (!worldTriggerAtivo()) return;
+  if (!(worldTriggerEstado.triggersAtivos || []).some(x => String(x).toLowerCase() === 'chameleon')) return mostrarPopup('⚠️ Chameleon não está equipado na sua ficha.');
   worldTriggerEstado.chameleon = !worldTriggerEstado.chameleon;
   if (worldTriggerEstado.chameleon) worldTriggerEstado.bagworm = false;
   salvarEstadoWorldTrigger();
@@ -196,9 +273,9 @@ function aplicarVisibilidadeTokenWT(token) {
   token.style.opacity = oculto ? '0' : '1';
 }
 
-function registrarTokenNoRadarWT(id, nome, x, y, squad, bagworm, chameleon, trionAtual = null) {
+function registrarTokenNoRadarWT(id, nome, x, y, squad, bagworm, chameleon, trionAtual = null, triggers = []) {
   if (!worldTriggerAtivo()) return;
-  worldTriggerEstado.tokens[id] = { id, nome, x, y, squad: squad || '', bagworm: !!bagworm, chameleon: !!chameleon, trion: trionAtual };
+  worldTriggerEstado.tokens[id] = { id, nome, x, y, squad: squad || '', bagworm: !!bagworm, chameleon: !!chameleon, trion: trionAtual, triggers: Array.isArray(triggers) ? triggers : [] };
   atualizarRadarWorldTrigger();
 }
 
@@ -376,7 +453,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             payload.payload.hpAtual ?? 50, 
             payload.payload.hpMax ?? 50, 
             String(payload.payload.nome || '').trim().toLowerCase() === obterMeuNickWT().trim().toLowerCase(),
-            { squad: payload.payload.squad || '', bagworm: !!payload.payload.bagworm, chameleon: !!payload.payload.chameleon, trion: payload.payload.trion ?? null }
+            { squad: payload.payload.squad || '', bagworm: !!payload.payload.bagworm, chameleon: !!payload.payload.chameleon, trion: payload.payload.trion ?? null, triggers: Array.isArray(payload.payload.triggers) ? payload.payload.triggers : [] }
           );
         })
         .subscribe((status) => {
@@ -426,6 +503,7 @@ window.addEventListener('message', async (event) => {
 
   const foiEdicao = event.data.modo === 'edicao';
   dadosFichaAtual = event.data.dados;
+  if (worldTriggerAtivo()) { worldTriggerEstado.triggersAtivos = normalizarTriggersFichaWT(dadosFichaAtual); salvarEstadoWorldTrigger(); }
   if (foiEdicao && event.data.userId) {
     fichaEditandoUserId = event.data.userId;
   }
@@ -509,6 +587,7 @@ async function fazerLogout() {
 }
 
 function atualizarInterfaceAuth(user) {
+  window.usuarioAtualId = user?.id || null;
   const formLogin = document.getElementById('form-login');
   const statusUsuario = document.getElementById('status-usuario');
   const painelMapaMestre = document.getElementById('painel-mapa-mestre');
@@ -718,8 +797,11 @@ function salvarCampanhaLocalmente() {
 async function carregarCampanhasDoUsuario(userId) {
   if (!supabaseClient || !userId) return;
   const lista = document.getElementById('lista-campanhas');
-  if (lista) lista.innerHTML = '<div class="estado-galeria">Carregando suas campanhas...</div>';
+  if (lista) lista.innerHTML = '<div class="estado-galeria">Carregando campanhas disponíveis...</div>';
 
+  // A campanha agora pode ser descoberta por qualquer usuário autenticado,
+  // mas isso NÃO concede acesso aos dados da mesa. O acesso continua sendo
+  // controlado por campanha_membros + RLS.
   const { data, error } = await supabaseClient
     .from('campanhas')
     .select('id,nome,descricao,sistema_id,mestre_id,created_at,updated_at,sistemas(id,nome,descricao,configuracao)')
@@ -727,30 +809,117 @@ async function carregarCampanhasDoUsuario(userId) {
 
   if (error) {
     console.error('Erro ao carregar campanhas:', error);
-    if (lista) lista.innerHTML = '<div class="estado-galeria">Não foi possível carregar as campanhas. Execute a migração SQL da Etapa 1 no Supabase.</div>';
+    if (lista) lista.innerHTML = '<div class="estado-galeria">Não foi possível carregar as campanhas. Execute a migração de acesso por solicitação no Supabase.</div>';
     return;
   }
 
-  campanhasDisponiveis = data || [];
-  let idSalvo = null;
-  try { idSalvo = localStorage.getItem('cronicas_camelot_campanha'); } catch (err) {}
+  const { data: pedidos, error: pedidosError } = await supabaseClient
+    .from('campanha_pedidos')
+    .select('id,campanha_id,status,created_at,resolved_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+  if (pedidosError) console.warn('Pedidos de entrada indisponíveis:', pedidosError);
 
-  const escolhida = campanhasDisponiveis.find(c => c.id === idSalvo) || campanhasDisponiveis[0] || null;
-  if (escolhida) await selecionarCampanha(escolhida.id, false);
-  else {
-    campanhaAtual = null;
-    sistemaAtual = null;
-    atualizarContextoCampanha();
-    renderizarListaCampanhas();
-  }
+  const { data: meusMembros, error: membrosError } = await supabaseClient
+    .from('campanha_membros')
+    .select('campanha_id,papel')
+    .eq('user_id', userId);
+  if (membrosError) console.warn('Vínculos de campanha indisponíveis:', membrosError);
+
+  campanhasDisponiveis = data || [];
+  window.pedidosCampanhaUsuario = pedidos || [];
+  window.campanhasMembroIds = new Set((meusMembros || []).map(m => m.campanha_id));
+
+  // Não entra automaticamente na primeira campanha. O jogador precisa
+  // escolher uma campanha ou solicitar acesso.
+  campanhaAtual = null;
+  sistemaAtual = null;
+  atualizarContextoCampanha();
+  renderizarListaCampanhas();
 
   const btn = document.getElementById('btn-nova-campanha');
   if (btn) btn.style.display = ehMestreGlobal ? 'inline-flex' : 'none';
+  if (ehMestreGlobal) await carregarPedidosComoMestre();
+
+  // Se o usuário já era membro de uma campanha anteriormente selecionada,
+  // deixamos a campanha visível como opção, mas não carregamos seus dados sem
+  // que ele clique nela nesta sessão.
+}
+
+async function carregarPedidosComoMestre() {
+  const painel = document.getElementById('painel-pedidos-campanha');
+  const lista = document.getElementById('lista-pedidos-campanha');
+  if (!ehMestreGlobal || !supabaseClient || !painel || !lista) return;
+  painel.style.display = 'block';
+  const { data, error } = await supabaseClient
+    .from('campanha_pedidos')
+    .select('id,campanha_id,user_id,status,created_at,campanhas(nome)')
+    .eq('status', 'pendente')
+    .order('created_at', { ascending: true });
+  if (error) {
+    console.warn('Não foi possível carregar pedidos:', error);
+    lista.innerHTML = '<div class="estado-galeria">Execute o SQL de acesso por solicitação.</div>';
+    return;
+  }
+  if (!data?.length) { lista.innerHTML = '<div class="estado-galeria">Nenhum pedido pendente.</div>'; return; }
+  lista.innerHTML = data.map(p => {
+    const camp = p.campanhas?.nome || 'Campanha';
+    const dataPedido = p.created_at ? new Date(p.created_at).toLocaleString('pt-BR') : '';
+    return `<article class="card-campanha"><div class="card-campanha-conteudo"><span class="card-campanha-icone">📨</span><div><h3>Pedido de entrada</h3><p>Jogador: <strong>${escaparHTML(p.user_id)}</strong></p><span class="card-campanha-meta">🏰 ${escaparHTML(camp)} · ${escaparHTML(dataPedido)}</span></div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn-selecionar-campanha" onclick="resolverPedidoCampanha('${p.id}', true)">✅ Aceitar</button><button type="button" class="btn-secundario" onclick="resolverPedidoCampanha('${p.id}', false)">❌ Recusar</button></div></article>`;
+  }).join('');
+}
+
+async function resolverPedidoCampanha(pedidoId, aceitar) {
+  if (!ehMestreGlobal || !supabaseClient) return;
+  const { error } = await supabaseClient.rpc('resolver_pedido_campanha', { p_pedido: pedidoId, p_aceitar: aceitar });
+  if (error) { console.error(error); return mostrarPopup('❌ Não foi possível resolver o pedido: ' + error.message); }
+  await carregarPedidosComoMestre();
+  mostrarPopup(aceitar ? '✅ Jogador aceito na campanha.' : '❌ Pedido recusado.');
+}
+
+async function usuarioEhMembroDaCampanha(campanhaId) {
+  if (!supabaseClient || !campanhaId) return false;
+  if (ehMestreGlobal) return true;
+  const { data, error } = await supabaseClient.rpc('eh_membro_da_campanha', { p_campanha: campanhaId });
+  if (error) { console.warn('Não foi possível verificar membro da campanha:', error); return false; }
+  return data === true;
+}
+
+function obterPedidoCampanha(campanhaId) {
+  const pedidos = Array.isArray(window.pedidosCampanhaUsuario) ? window.pedidosCampanhaUsuario : [];
+  return pedidos.find(p => p.campanha_id === campanhaId && p.status === 'pendente') || null;
+}
+
+async function solicitarEntradaCampanha(campanhaId) {
+  if (!supabaseClient || !campanhaId) return;
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (!session?.user) return mostrarPopup('❌ Faça login para solicitar entrada.');
+  if (await usuarioEhMembroDaCampanha(campanhaId)) {
+    await selecionarCampanha(campanhaId);
+    return;
+  }
+  if (obterPedidoCampanha(campanhaId)) return mostrarPopup('⏳ Seu pedido de entrada já está pendente.');
+
+  const { error } = await supabaseClient.from('campanha_pedidos').insert({
+    campanha_id: campanhaId, user_id: session.user.id, status: 'pendente'
+  });
+  if (error) {
+    console.error('Erro ao solicitar entrada:', error);
+    return mostrarPopup('❌ Não foi possível enviar o pedido: ' + error.message);
+  }
+  window.pedidosCampanhaUsuario = [{ campanha_id: campanhaId, user_id: session.user.id, status: 'pendente', created_at: new Date().toISOString() }, ...(window.pedidosCampanhaUsuario || [])];
+  renderizarListaCampanhas();
+  mostrarPopup('📨 Pedido enviado ao Mestre. Aguarde a aprovação.');
 }
 
 async function selecionarCampanha(campanhaId, mostrarFeedback = true) {
   const campanha = campanhasDisponiveis.find(c => c.id === campanhaId);
   if (!campanha) return;
+
+  const membro = await usuarioEhMembroDaCampanha(campanhaId);
+  if (!membro) {
+    return solicitarEntradaCampanha(campanhaId);
+  }
 
   campanhaAtual = campanha;
 
@@ -815,15 +984,22 @@ function renderizarListaCampanhas() {
     const card = document.createElement('article');
     card.className = 'card-campanha' + (campanhaAtual?.id === campanha.id ? ' ativa' : '');
     const sistema = campanha.sistemas?.nome || 'Sistema não definido';
-    const mestre = campanha.mestre_id && campanha.mestre_id === campanhaAtual?.mestre_id ? 'Mestre da campanha' : 'Campanha compartilhada';
+    const pedido = obterPedidoCampanha(campanha.id);
+    const souMestre = ehMestreGlobal || campanha.mestre_id === window.usuarioAtualId;
+    const membroConhecido = campanhaAtual?.id === campanha.id || souMestre || (window.campanhasMembroIds instanceof Set && window.campanhasMembroIds.has(campanha.id));
+    let acao = 'solicitarEntradaCampanha';
+    let textoBotao = '📨 Solicitar entrada';
+    if (campanhaAtual?.id === campanha.id) { acao = 'selecionarCampanha'; textoBotao = '✓ Campanha ativa'; }
+    else if (pedido) { acao = null; textoBotao = '⏳ Pedido pendente'; }
+    else if (membroConhecido) { acao = 'selecionarCampanha'; textoBotao = 'Entrar nesta campanha'; }
     card.innerHTML = `
       <div class="card-campanha-conteudo">
         <span class="card-campanha-icone">🏰</span>
         <div><h3>${escaparHTML(campanha.nome)}</h3>
         <p>${escaparHTML(campanha.descricao || 'Sem descrição.')}</p>
-        <span class="card-campanha-meta">⚙️ ${escaparHTML(sistema)} · ${escaparHTML(mestre)}</span></div>
+        <span class="card-campanha-meta">⚙️ ${escaparHTML(sistema)} · ${membroConhecido ? 'Você tem acesso' : 'Acesso mediante aprovação do Mestre'}</span></div>
       </div>
-      <button type="button" class="btn-selecionar-campanha" onclick="selecionarCampanha('${campanha.id}')">${campanhaAtual?.id === campanha.id ? '✓ Campanha ativa' : 'Entrar nesta campanha'}</button>`;
+      ${acao ? `<button type="button" class="btn-selecionar-campanha" onclick="${acao}('${campanha.id}')">${textoBotao}</button>` : `<button type="button" class="btn-selecionar-campanha" disabled>${textoBotao}</button>`}`;
     lista.appendChild(card);
   });
 }
@@ -1347,6 +1523,7 @@ async function carregarFichaDoUsuario(userId) {
   if (data && data.dados_ficha) {
     dadosFichaAtual = data.dados_ficha;
     renderizarFichaNaTela(dadosFichaAtual);
+    if (worldTriggerAtivo()) { worldTriggerEstado.triggersAtivos = normalizarTriggersFichaWT(dadosFichaAtual); salvarEstadoWorldTrigger(); renderizarPainelWTSeNecessario(); }
   }
 }
 
@@ -1835,6 +2012,7 @@ function criarEfeitoPing(x, y) {
 
 // --- MODAL DE CONFIGURAÇÃO DE TOKEN ---
 async function abrirModalConfigToken() {
+  if (worldTriggerAtivo()) { await carregarTriggersDaFichaWorldTrigger(); }
   let modal = document.getElementById('modal-config-token');
   if (!modal) {
     modal = document.createElement('div');
@@ -1885,8 +2063,9 @@ async function abrirModalConfigToken() {
         <label style="color:#e6ca88; font-size:.85rem;">Squad
           <input id="wt-token-squad-input" type="text" maxlength="40" value="${escaparHTML(worldTriggerEstado.meuSquad || '')}" placeholder="Ex.: A-01" style="width:100%; margin-top:3px; padding:6px; background:#0b0d12; color:#fff; border:1px solid #4a3d24; border-radius:4px; box-sizing:border-box;">
         </label>
-        <label style="display:flex;align-items:center;gap:7px;color:#e6ca88;font-size:.85rem;"><input id="wt-token-bagworm" type="checkbox" ${worldTriggerEstado.bagworm?'checked':''}> Bagworm — fora do radar</label>
-        <label style="display:flex;align-items:center;gap:7px;color:#e6ca88;font-size:.85rem;"><input id="wt-token-chameleon" type="checkbox" ${worldTriggerEstado.chameleon?'checked':''}> Chameleon — invisível</label>
+        <label style="display:flex;align-items:center;gap:7px;color:#e6ca88;font-size:.85rem;"><input id="wt-token-bagworm" type="checkbox" ${worldTriggerEstado.bagworm?'checked':''} ${!worldTriggerEstado.triggersAtivos.some(x=>String(x).toLowerCase()==='bagworm')?'disabled':''}> Bagworm — fora do radar</label>
+        <label style="display:flex;align-items:center;gap:7px;color:#e6ca88;font-size:.85rem;"><input id="wt-token-chameleon" type="checkbox" ${worldTriggerEstado.chameleon?'checked':''} ${!worldTriggerEstado.triggersAtivos.some(x=>String(x).toLowerCase()==='chameleon')?'disabled':''}> Chameleon — invisível</label>
+        <div style="padding:7px;background:#071018;border:1px solid #1e4f68;border-radius:4px;"><strong style="color:#69d3ff;font-size:.82rem;">⚔️ Triggers da ficha</strong><div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;">${(worldTriggerEstado.triggersAtivos||[]).length ? worldTriggerEstado.triggersAtivos.map(x=>`<span style="padding:4px 6px;border:1px solid #2d91bd;border-radius:4px;color:#d7f3ff;font-size:.78rem;">${escaparHTML(x)}</span>`).join('') : '<span style="color:#ffca70;font-size:.78rem;">Nenhum Trigger selecionado na ficha.</span>'}</div></div>
       </div>` : ''}
 
       <div style="margin-bottom: 8px;">
@@ -1922,8 +2101,8 @@ function confirmarCriacaoToken() {
   const imagem = document.getElementById('token-url-escolhida').value.trim();
   if (worldTriggerAtivo()) {
     worldTriggerEstado.meuSquad = String(document.getElementById('wt-token-squad-input')?.value || '').trim();
-    worldTriggerEstado.bagworm = !!document.getElementById('wt-token-bagworm')?.checked;
-    worldTriggerEstado.chameleon = !!document.getElementById('wt-token-chameleon')?.checked;
+    worldTriggerEstado.bagworm = !!document.getElementById('wt-token-bagworm')?.checked && worldTriggerEstado.triggersAtivos.some(x=>String(x).toLowerCase()==='bagworm');
+    worldTriggerEstado.chameleon = !!document.getElementById('wt-token-chameleon')?.checked && worldTriggerEstado.triggersAtivos.some(x=>String(x).toLowerCase()==='chameleon');
     if (worldTriggerEstado.bagworm) worldTriggerEstado.chameleon = false;
     if (worldTriggerEstado.chameleon) worldTriggerEstado.bagworm = false;
     salvarEstadoWorldTrigger();
@@ -1941,14 +2120,15 @@ function executarAdicionarTokenMesa(tamanho = 45, imagem = '', hpMax = 50, hpAtu
   criarElementoToken(tokenID, userNick, 10, 10, tamanho, imagem, hpAtual, hpMax, true, {
     squad: worldTriggerEstado.meuSquad,
     bagworm: worldTriggerEstado.bagworm,
-    chameleon: worldTriggerEstado.chameleon
+    chameleon: worldTriggerEstado.chameleon,
+    triggers: [...worldTriggerEstado.triggersAtivos]
   });
   
   if (canalMesa) {
     canalMesa.send({
       type: 'broadcast',
       event: 'vtt_mover_token',
-      payload: { id: tokenID, nome: userNick, x: 10, y: 10, tamanho, imagem, hpAtual, hpMax, campanha_id: obterCampanhaIdAtual(), squad: worldTriggerEstado.meuSquad || '', bagworm: !!worldTriggerEstado.bagworm, chameleon: !!worldTriggerEstado.chameleon }
+      payload: { id: tokenID, nome: userNick, x: 10, y: 10, tamanho, imagem, hpAtual, hpMax, campanha_id: obterCampanhaIdAtual(), squad: worldTriggerEstado.meuSquad || '', bagworm: !!worldTriggerEstado.bagworm, chameleon: !!worldTriggerEstado.chameleon, triggers: [...worldTriggerEstado.triggersAtivos] }
     });
   }
   mostrarPopup('🛡️ Token posicionado na Távola!');
@@ -1975,6 +2155,7 @@ function criarElementoToken(id, nome, x, y, tamanho = 45, imagem = '', hpAtual =
   token.dataset.tokenSquad = metadados.squad || token.dataset.tokenSquad || '';
   token.dataset.tokenBagworm = String(!!metadados.bagworm || token.dataset.tokenBagworm === 'true');
   token.dataset.tokenChameleon = String(!!metadados.chameleon || token.dataset.tokenChameleon === 'true');
+  token.dataset.tokenTriggers = JSON.stringify(Array.isArray(metadados.triggers) ? metadados.triggers : (token.dataset.tokenTriggers ? JSON.parse(token.dataset.tokenTriggers) : []));
   token.dataset.tokenTrion = metadados.trion ?? token.dataset.tokenTrion ?? '';
 
   token.style.width = `${tamanho}px`;
@@ -2019,7 +2200,7 @@ function criarElementoToken(id, nome, x, y, tamanho = 45, imagem = '', hpAtual =
   hpTag.innerText = `${hpAtual}/${hpMax}`;
   hpTag.style.color = hpAtual <= (hpMax * 0.25) ? '#ff5252' : (hpAtual <= (hpMax * 0.5) ? '#ffab40' : '#04d361');
   if (worldTriggerAtivo()) {
-    registrarTokenNoRadarWT(id, nome, x, y, token.dataset.tokenSquad, token.dataset.tokenBagworm === 'true', token.dataset.tokenChameleon === 'true', token.dataset.tokenTrion || null);
+    registrarTokenNoRadarWT(id, nome, x, y, token.dataset.tokenSquad, token.dataset.tokenBagworm === 'true', token.dataset.tokenChameleon === 'true', token.dataset.tokenTrion || null, JSON.parse(token.dataset.tokenTriggers || '[]'));
     aplicarVisibilidadeTokenWT(token);
   }
 

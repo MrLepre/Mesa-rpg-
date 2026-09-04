@@ -180,10 +180,31 @@ async function carregarTriggersDaFichaWorldTrigger(){
     return triggers;
   }catch(err){ console.warn('Não foi possível carregar os Triggers da ficha:',err); return []; }
 }
+const ARSENAL_WORLD_TRIGGER_FALLBACK=[
+  {nome:'Kogetsu',categoria:'Atacante',custoBase:1},
+  {nome:'Scorpion',categoria:'Atacante',custoBase:1},
+  {nome:'Raygust',categoria:'Atacante',custoBase:1},
+  {nome:'Asteroid',categoria:'Artilheiro',custo:1,efeito:'Dano bruto puro'},
+  {nome:'Hound',categoria:'Artilheiro',custo:2,efeito:'Projéteis seguem o alvo'},
+  {nome:'Viper',categoria:'Artilheiro',custo:'2–3',efeito:'Trajetória definida pelo jogador'},
+  {nome:'Meteor',categoria:'Artilheiro',custo:3,efeito:'Dano em área'},
+  {nome:'Lightning',categoria:'Sniper',custo:2,efeito:'Tiro rápido, difícil de evitar'},
+  {nome:'Egret',categoria:'Sniper',custo:3,efeito:'Tiro equilibrado'},
+  {nome:'Ibis',categoria:'Sniper',custo:4,efeito:'Destruição massiva'},
+  {nome:'Shield',categoria:'Opcional',custo:'1–2',efeito:'Cria barreira de Trion'},
+  {nome:'Bagworm',categoria:'Opcional',custo:'1 por turno',efeito:'Remove usuário do radar'},
+  {nome:'Chameleon',categoria:'Opcional',custo:'2 por turno',efeito:'Invisibilidade total'},
+  {nome:'Spider',categoria:'Opcional',custo:2,efeito:'Cria fios no cenário'},
+  {nome:'Lead Bullet',categoria:'Opcional',custo:3,efeito:'Projétil que pesa o alvo'},
+  {nome:'Thruster',categoria:'Opcional',custo:2,efeito:'Impulso de movimento'},
+  {nome:'Bail Out',categoria:'Especial',custo:'especial',efeito:'Retirada automática do combate'}
+];
 function obterDefinicaoTriggerWT(nome){
-  const arsenal=obterConfiguracaoSistemaAtualWT()?.arsenal||{};
-  const todos=[...(arsenal.atacantes||[]),...(arsenal.armeiros||[]),...(arsenal.snipers||[]),...(arsenal.opcionais||[])];
-  return todos.find(t=>String(t.nome||'').toLowerCase()===String(nome||'').toLowerCase())||null;
+  const cfg=obterConfiguracaoSistemaAtualWT()||{};
+  const a=cfg.arsenal||cfg.especial?.arsenal||{};
+  const todos=[...(a.atacantes||[]),...(a.armeiros||[]),...(a.snipers||[]),...(a.opcionais||[])];
+  const lista=todos.length?todos:ARSENAL_WORLD_TRIGGER_FALLBACK;
+  return lista.find(t=>String(t.nome||'').toLowerCase()===String(nome||'').toLowerCase())||null;
 }
 function renderizarTriggersAtivosNoMapa(){
   const triggers=worldTriggerEstado.triggersAtivos||[];

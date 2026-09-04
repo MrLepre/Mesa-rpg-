@@ -1,0 +1,25 @@
+CRÔNICAS DE CAMELOT — CLASSES E SINERGIA ELEMENTAL
+
+ALTERAÇÕES
+1. Nova aba "⚔️ Classes" no VTT, exibida somente quando a campanha ativa usa Crônicas de Camelot.
+2. A ficha legada agora possui o campo "Classe", salvo/exportado junto com os demais dados.
+3. Classes cadastradas: Guerreiro, Berserker, Assassino, Mago, Arqueiro, Bardo e Curandeiro.
+4. Sinergia elemental corrigida para seis elementos e relações simétricas.
+5. Ordem fixa do diagrama: topo Fogo; superior-direita Raio; inferior-direita Terra; inferior Água; inferior-esquerda Gelo; superior-esquerda Vento.
+6. Elemento principal = 3; maiores sinergias = 2; pouca sinergia = 1; sem sinergia = 0.
+
+MAIORES SINERGIAS (2)
+Fogo ↔ Vento, Raio
+Vento ↔ Fogo, Terra
+Raio ↔ Fogo, Terra
+Terra ↔ Raio, Vento
+Água ↔ Gelo, Terra
+Gelo ↔ Vento, Terra
+
+COMPLEMENTO SIMÉTRICO
+As relações de 1 e 0 não foram especificadas na lista original. Para evitar a antiga assimetria da ficha, esta versão completa a matriz de forma simétrica:
+- 0: Fogo ↔ Terra; Raio ↔ Gelo; Água ↔ Vento.
+- 1: todas as demais relações não listadas como 2 ou 0.
+
+IMPORTANTE
+Essa complementação dos valores 1/0 é uma decisão de implementação, pois a especificação fornecida define explicitamente as maiores sinergias, mas não enumera quais pares são "pouca sinergia" e quais são "sem sinergia".

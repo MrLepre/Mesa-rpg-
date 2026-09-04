@@ -645,6 +645,20 @@
             font-size: 0.95em;
         }
 
+
+        /* Diagrama elemental de Camelot */
+        .elemento-diagrama{position:relative;width:100%;max-width:390px;aspect-ratio:1/1;margin:8px auto 10px;border:1px solid rgba(197,160,89,.18);border-radius:10px;background:radial-gradient(circle at 50% 50%,rgba(197,160,89,.06),rgba(7,9,15,.88) 62%);overflow:hidden}
+        .elemento-linhas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+        .elemento-linhas line{stroke:rgba(197,160,89,.38);stroke-width:.55}
+        .elemento-centro{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:grid;place-items:center;width:104px;height:68px;border:1px solid #6d572d;border-radius:50%;background:rgba(8,10,15,.92);box-shadow:0 0 18px rgba(197,160,89,.08);text-align:center}
+        .elemento-centro strong{font-family:'Cinzel',serif;font-size:.72rem;color:var(--accent-gold);letter-spacing:1px}
+        .elemento-centro small{font-size:.7rem;color:var(--border-gold-light)}
+        .elemento-no{position:absolute;transform:translate(-50%,-50%);display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:5px;min-width:98px;padding:7px 9px;border:1px solid #4a3d24;border-radius:8px;background:rgba(11,13,18,.94);box-shadow:0 4px 12px rgba(0,0,0,.45)}
+        .elemento-no span{font-size:1rem}.elemento-no b{font-family:'Cinzel',serif;color:#e2d9c5;font-size:.72rem}.elemento-no strong{font-family:'Cinzel',serif;color:var(--accent-gold);font-size:1.05rem}
+        .elemento-fogo{left:50%;top:10%}.elemento-raio{left:84%;top:30%}.elemento-terra{left:79%;top:76%}.elemento-agua{left:50%;top:91%}.elemento-gelo{left:21%;top:76%}.elemento-vento{left:16%;top:30%}
+        .elemento-legenda{display:flex;justify-content:center;gap:7px;flex-wrap:wrap;color:#a99d84;font-size:.72rem;margin-top:5px}.elemento-legenda span{padding:3px 6px;border:1px solid #332b1e;border-radius:999px;background:#0b0d12}.elemento-legenda b{color:var(--accent-gold)}
+        @media(max-width:480px){.elemento-no{min-width:82px;padding:5px 6px;grid-template-columns:auto 1fr;gap:3px}.elemento-no strong{grid-column:2;font-size:.92rem;margin-top:-3px}.elemento-centro{width:84px;height:58px}.elemento-centro strong{font-size:.62rem}.elemento-centro small{font-size:.6rem}}
+
         /* CONFIGURAÇÕES DE IMPRESSÃO / PDF LIMPO */
         @media print {
             body {
@@ -774,6 +788,18 @@
         <div class="campo-texto">
             <label>Título de Glória / Epíteto</label>
             <input type="text" id="titulo" placeholder="Ex: O Cavaleiro da Oculta Floresta">
+        </div>
+        <div class="campo-texto">
+            <label>Classe</label>
+            <select id="classe">
+                <option value="Guerreiro">Guerreiro</option>
+                <option value="Berserker">Berserker</option>
+                <option value="Assassino">Assassino</option>
+                <option value="Mago">Mago</option>
+                <option value="Arqueiro">Arqueiro</option>
+                <option value="Bardo">Bardo</option>
+                <option value="Curandeiro">Curandeiro</option>
+            </select>
         </div>
     </div>
 
@@ -957,13 +983,27 @@
                     <option value="Vento">Vento</option>
                 </select>
             </div>
-            <div class="pentagono-grid">
-                <div class="elemento-box"><label>🔥 Fogo:</label><span id="val_fogo" class="valor-elem">3</span></div>
-                <div class="elemento-box"><label>⚡ Raio:</label><span id="val_raio" class="valor-elem">2</span></div>
-                <div class="elemento-box"><label>🍃 Vento:</label><span id="val_vento" class="valor-elem">2</span></div>
-                <div class="elemento-box"><label>⛰️ Terra:</label><span id="val_terra" class="valor-elem">1</span></div>
-                <div class="elemento-box"><label>💧 Água:</label><span id="val_agua" class="valor-elem">0</span></div>
-                <div class="elemento-box"><label>❄️ Gelo:</label><span id="val_gelo" class="valor-elem">0</span></div>
+            <div class="elemento-diagrama" aria-label="Diagrama de sinergia elemental">
+                <svg class="elemento-linhas" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                    <line x1="50" y1="12" x2="82" y2="31"/>
+                    <line x1="82" y1="31" x2="78" y2="73"/>
+                    <line x1="78" y1="73" x2="50" y2="90"/>
+                    <line x1="50" y1="90" x2="22" y2="73"/>
+                    <line x1="22" y1="73" x2="18" y2="31"/>
+                    <line x1="18" y1="31" x2="50" y2="12"/>
+                    <line x1="78" y1="73" x2="22" y2="73"/>
+                    <line x1="78" y1="73" x2="18" y2="31"/>
+                </svg>
+                <div class="elemento-centro"><strong>SINERGIA</strong><small>3 / 2 / 1 / 0</small></div>
+                <div class="elemento-no elemento-fogo"><span>🔥</span><b>Fogo</b><strong id="val_fogo">3</strong></div>
+                <div class="elemento-no elemento-raio"><span>⚡</span><b>Raio</b><strong id="val_raio">2</strong></div>
+                <div class="elemento-no elemento-terra"><span>⛰️</span><b>Terra</b><strong id="val_terra">1</strong></div>
+                <div class="elemento-no elemento-agua"><span>💧</span><b>Água</b><strong id="val_agua">0</strong></div>
+                <div class="elemento-no elemento-gelo"><span>❄️</span><b>Gelo</b><strong id="val_gelo">0</strong></div>
+                <div class="elemento-no elemento-vento"><span>🍃</span><b>Vento</b><strong id="val_vento">2</strong></div>
+            </div>
+            <div class="elemento-legenda">
+                <span><b>3</b> Principal</span><span><b>2</b> Maior sinergia</span><span><b>1</b> Pouca sinergia</span><span><b>0</b> Sem sinergia</span>
             </div>
         </div>
     </div>
@@ -1056,23 +1096,27 @@
             <ul>
                 <li><b>Valores:</b>
                     <br>• <b>Principal:</b> <b>3</b>.
-                    <br>• <b>Conexão Forte:</b> <b>2</b>.
-                    <br>• <b>Conexão Fraca:</b> <b>1</b>.
-                    <br>• <b>Opostos:</b> <b>0</b>.
+                    <br>• <b>Maior sinergia:</b> <b>2</b>.
+                    <br>• <b>Pouca sinergia:</b> <b>1</b>.
+                    <br>• <b>Sem sinergia:</b> <b>0</b>.
                 </li>
+                <li style="margin-top:10px;"><b>Maiores sinergias:</b> Fogo ↔ Vento/Raio; Vento ↔ Fogo/Terra; Raio ↔ Fogo/Terra; Terra ↔ Raio/Vento; Água ↔ Gelo/Terra; Gelo ↔ Vento/Terra.</li>
             </ul>
         </div>
     </div>
 </div>
 
 <script>
+// Sinergias definidas para Camelot. As relações de 2 são exatamente as
+// maiores sinergias fornecidas. As relações restantes foram completadas de
+// forma simétrica: três pares sem sinergia (0) e as demais relações com 1.
 const mapaSinergias = {
-    "Fogo": { Fogo: 3, Raio: 2, Vento: 2, Terra: 1, Água: 0, Gelo: 0 },
-    "Raio": { Raio: 3, Fogo: 2, Terra: 2, Vento: 1, Gelo: 0, Água: 0 },
-    "Terra": { Terra: 3, Raio: 2, Gelo: 2, Água: 1, Fogo: 0, Vento: 0 },
-    "Água": { Água: 3, Gelo: 2, Terra: 2, Fogo: 1, Raio: 0, Gelo: 0 },
-    "Gelo": { Gelo: 3, Água: 2, Vento: 2, Terra: 1, Fogo: 0, Raio: 0 },
-    "Vento": { Vento: 3, Fogo: 2, Gelo: 2, Raio: 1, Terra: 0, Água: 0 }
+    "Fogo": { Fogo: 3, Raio: 2, Terra: 0, Água: 1, Gelo: 1, Vento: 2 },
+    "Raio": { Fogo: 2, Raio: 3, Terra: 2, Água: 1, Gelo: 0, Vento: 1 },
+    "Terra": { Fogo: 0, Raio: 2, Terra: 3, Água: 2, Gelo: 2, Vento: 2 },
+    "Água": { Fogo: 1, Raio: 1, Terra: 2, Água: 3, Gelo: 2, Vento: 0 },
+    "Gelo": { Fogo: 1, Raio: 0, Terra: 2, Água: 2, Gelo: 3, Vento: 2 },
+    "Vento": { Fogo: 2, Raio: 1, Terra: 2, Água: 0, Gelo: 2, Vento: 3 }
 };
 
 const periciasCatalogo = [
@@ -1242,7 +1286,7 @@ function gerarPDF() {
 }
 
 const listaCamposFixos = [
-    'nome', 'tipo_humano', 'antecedente', 'titulo', 'nivel', 'xp_atual',
+    'nome', 'tipo_humano', 'antecedente', 'titulo', 'classe', 'nivel', 'xp_atual',
     'historia_origem', 'historia_motivacao',
     'aparencia_civil', 'input_civil_base64',
     'aparencia_armadura', 'input_armadura_base64',

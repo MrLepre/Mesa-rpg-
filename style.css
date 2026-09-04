@@ -1231,3 +1231,19 @@ body.imagem-mestre-aberta { overflow:hidden !important; }
 
 /* World Trigger — loadout e opções do mapa */
 .wt-triggers-mapa{margin:10px 0;padding:10px;border:1px solid #1e4f68;border-radius:6px;background:#071018}.wt-triggers-mapa>strong{display:block;color:#69d3ff;margin-bottom:7px}.wt-triggers-mapa-lista{display:flex;flex-wrap:wrap;gap:7px}.wt-trigger-btn{background:#0c2433;color:#d7f3ff;border:1px solid #2d91bd;border-radius:5px;padding:7px 9px;cursor:pointer;font:inherit}.wt-trigger-btn:hover,.wt-trigger-btn.ativo{border-color:#69d3ff;box-shadow:0 0 8px rgba(57,184,255,.14)}.wt-trigger-btn small{display:block;color:#8aaaba;font-size:.72rem}.wt-sem-triggers{padding:9px;border:1px dashed #765b2b;border-radius:5px;color:#ffca70;background:#15110a}.wt-slot-group{max-height:360px;overflow:auto}
+
+
+/* =========================================================
+   CRÔNICAS DE CAMELOT — CLASSES
+   ========================================================= */
+.classes-grid-camelot{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.classe-card-camelot{display:grid;grid-template-columns:auto 1fr;gap:12px;padding:16px;border:1px solid #3b3326;border-radius:9px;background:linear-gradient(145deg,#151923,#0c1017);box-shadow:0 8px 22px rgba(0,0,0,.18);min-width:0}
+.classe-card-camelot:hover{border-color:#8d6d2f;box-shadow:0 10px 26px rgba(0,0,0,.25),inset 0 0 0 1px rgba(197,160,89,.08)}
+.classe-card-icone{width:44px;height:44px;display:grid;place-items:center;border:1px solid #8d6d2f;border-radius:50%;background:#211c12;font-size:1.35rem}
+.classe-card-camelot h3{margin:0 0 3px;color:#f3d075;font-family:'Cinzel',serif;font-size:1.08rem}
+.classe-funcao{display:block;color:#c5a059;font-size:.88rem;margin-bottom:8px}
+.classe-card-camelot p,.classe-card-camelot ul{margin:0;color:#b9b3a7;line-height:1.45;font-size:.92rem}
+.classe-card-camelot ul{padding-left:18px}
+.classe-card-camelot li+li{margin-top:4px}
+.classe-card-camelot strong{color:#e6ca88}
+@media(max-width:800px){.classes-grid-camelot{grid-template-columns:1fr}}

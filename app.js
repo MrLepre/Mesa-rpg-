@@ -261,7 +261,6 @@ function atualizarEstadoTokenProprioWT() {
     token.dataset.tokenSquad = worldTriggerEstado.meuSquad;
     token.dataset.tokenBagworm = String(!!worldTriggerEstado.bagworm);
     token.dataset.tokenChameleon = String(!!worldTriggerEstado.chameleon);
-    token.dataset.tokenTriggers = JSON.stringify(worldTriggerEstado.triggersAtivos || []);
     aplicarVisibilidadeTokenWT(token);
     transmitirMovimentoToken(token, parseFloat(token.style.left) || 0, parseFloat(token.style.top) || 0);
   });
@@ -504,7 +503,7 @@ window.addEventListener('message', async (event) => {
 
   const foiEdicao = event.data.modo === 'edicao';
   dadosFichaAtual = event.data.dados;
-  if (worldTriggerAtivo()) { worldTriggerEstado.triggersAtivos = normalizarTriggersFichaWT(dadosFichaAtual); salvarEstadoWorldTrigger(); atualizarEstadoTokenProprioWT(); }
+  if (worldTriggerAtivo()) { worldTriggerEstado.triggersAtivos = normalizarTriggersFichaWT(dadosFichaAtual); salvarEstadoWorldTrigger(); }
   if (foiEdicao && event.data.userId) {
     fichaEditandoUserId = event.data.userId;
   }
@@ -588,6 +587,7 @@ async function fazerLogout() {
 }
 
 function atualizarInterfaceAuth(user) {
+  window.usuarioAtualId = user?.id || null;
   const formLogin = document.getElementById('form-login');
   const statusUsuario = document.getElementById('status-usuario');
   const painelMapaMestre = document.getElementById('painel-mapa-mestre');
@@ -797,8 +797,11 @@ function salvarCampanhaLocalmente() {
 async function carregarCampanhasDoUsuario(userId) {
   if (!supabaseClient || !userId) return;
   const lista = document.getElementById('lista-campanhas');
-  if (lista) lista.innerHTML = '<div class="estado-galeria">Carregando suas campanhas...</div>';
+  if (lista) lista.innerHTML = '<div class="estado-galeria">Carregando campanhas disponíveis...</div>';
 
+  // A campanha agora pode ser descoberta por qualquer usuário autenticado,
+  // mas isso NÃO concede acesso aos dados da mesa. O acesso continua sendo
+  // controlado por campanha_membros + RLS.
   const { data, error } = await supabaseClient
     .from('campanhas')
     .select('id,nome,descricao,sistema_id,mestre_id,created_at,updated_at,sistemas(id,nome,descricao,configuracao)')
@@ -806,30 +809,117 @@ async function carregarCampanhasDoUsuario(userId) {
 
   if (error) {
     console.error('Erro ao carregar campanhas:', error);
-    if (lista) lista.innerHTML = '<div class="estado-galeria">Não foi possível carregar as campanhas. Execute a migração SQL da Etapa 1 no Supabase.</div>';
+    if (lista) lista.innerHTML = '<div class="estado-galeria">Não foi possível carregar as campanhas. Execute a migração de acesso por solicitação no Supabase.</div>';
     return;
   }
 
-  campanhasDisponiveis = data || [];
-  let idSalvo = null;
-  try { idSalvo = localStorage.getItem('cronicas_camelot_campanha'); } catch (err) {}
+  const { data: pedidos, error: pedidosError } = await supabaseClient
+    .from('campanha_pedidos')
+    .select('id,campanha_id,status,created_at,resolved_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+  if (pedidosError) console.warn('Pedidos de entrada indisponíveis:', pedidosError);
 
-  const escolhida = campanhasDisponiveis.find(c => c.id === idSalvo) || campanhasDisponiveis[0] || null;
-  if (escolhida) await selecionarCampanha(escolhida.id, false);
-  else {
-    campanhaAtual = null;
-    sistemaAtual = null;
-    atualizarContextoCampanha();
-    renderizarListaCampanhas();
-  }
+  const { data: meusMembros, error: membrosError } = await supabaseClient
+    .from('campanha_membros')
+    .select('campanha_id,papel')
+    .eq('user_id', userId);
+  if (membrosError) console.warn('Vínculos de campanha indisponíveis:', membrosError);
+
+  campanhasDisponiveis = data || [];
+  window.pedidosCampanhaUsuario = pedidos || [];
+  window.campanhasMembroIds = new Set((meusMembros || []).map(m => m.campanha_id));
+
+  // Não entra automaticamente na primeira campanha. O jogador precisa
+  // escolher uma campanha ou solicitar acesso.
+  campanhaAtual = null;
+  sistemaAtual = null;
+  atualizarContextoCampanha();
+  renderizarListaCampanhas();
 
   const btn = document.getElementById('btn-nova-campanha');
   if (btn) btn.style.display = ehMestreGlobal ? 'inline-flex' : 'none';
+  if (ehMestreGlobal) await carregarPedidosComoMestre();
+
+  // Se o usuário já era membro de uma campanha anteriormente selecionada,
+  // deixamos a campanha visível como opção, mas não carregamos seus dados sem
+  // que ele clique nela nesta sessão.
+}
+
+async function carregarPedidosComoMestre() {
+  const painel = document.getElementById('painel-pedidos-campanha');
+  const lista = document.getElementById('lista-pedidos-campanha');
+  if (!ehMestreGlobal || !supabaseClient || !painel || !lista) return;
+  painel.style.display = 'block';
+  const { data, error } = await supabaseClient
+    .from('campanha_pedidos')
+    .select('id,campanha_id,user_id,status,created_at,campanhas(nome)')
+    .eq('status', 'pendente')
+    .order('created_at', { ascending: true });
+  if (error) {
+    console.warn('Não foi possível carregar pedidos:', error);
+    lista.innerHTML = '<div class="estado-galeria">Execute o SQL de acesso por solicitação.</div>';
+    return;
+  }
+  if (!data?.length) { lista.innerHTML = '<div class="estado-galeria">Nenhum pedido pendente.</div>'; return; }
+  lista.innerHTML = data.map(p => {
+    const camp = p.campanhas?.nome || 'Campanha';
+    const dataPedido = p.created_at ? new Date(p.created_at).toLocaleString('pt-BR') : '';
+    return `<article class="card-campanha"><div class="card-campanha-conteudo"><span class="card-campanha-icone">📨</span><div><h3>Pedido de entrada</h3><p>Jogador: <strong>${escaparHTML(p.user_id)}</strong></p><span class="card-campanha-meta">🏰 ${escaparHTML(camp)} · ${escaparHTML(dataPedido)}</span></div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn-selecionar-campanha" onclick="resolverPedidoCampanha('${p.id}', true)">✅ Aceitar</button><button type="button" class="btn-secundario" onclick="resolverPedidoCampanha('${p.id}', false)">❌ Recusar</button></div></article>`;
+  }).join('');
+}
+
+async function resolverPedidoCampanha(pedidoId, aceitar) {
+  if (!ehMestreGlobal || !supabaseClient) return;
+  const { error } = await supabaseClient.rpc('resolver_pedido_campanha', { p_pedido: pedidoId, p_aceitar: aceitar });
+  if (error) { console.error(error); return mostrarPopup('❌ Não foi possível resolver o pedido: ' + error.message); }
+  await carregarPedidosComoMestre();
+  mostrarPopup(aceitar ? '✅ Jogador aceito na campanha.' : '❌ Pedido recusado.');
+}
+
+async function usuarioEhMembroDaCampanha(campanhaId) {
+  if (!supabaseClient || !campanhaId) return false;
+  if (ehMestreGlobal) return true;
+  const { data, error } = await supabaseClient.rpc('eh_membro_da_campanha', { p_campanha: campanhaId });
+  if (error) { console.warn('Não foi possível verificar membro da campanha:', error); return false; }
+  return data === true;
+}
+
+function obterPedidoCampanha(campanhaId) {
+  const pedidos = Array.isArray(window.pedidosCampanhaUsuario) ? window.pedidosCampanhaUsuario : [];
+  return pedidos.find(p => p.campanha_id === campanhaId && p.status === 'pendente') || null;
+}
+
+async function solicitarEntradaCampanha(campanhaId) {
+  if (!supabaseClient || !campanhaId) return;
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (!session?.user) return mostrarPopup('❌ Faça login para solicitar entrada.');
+  if (await usuarioEhMembroDaCampanha(campanhaId)) {
+    await selecionarCampanha(campanhaId);
+    return;
+  }
+  if (obterPedidoCampanha(campanhaId)) return mostrarPopup('⏳ Seu pedido de entrada já está pendente.');
+
+  const { error } = await supabaseClient.from('campanha_pedidos').insert({
+    campanha_id: campanhaId, user_id: session.user.id, status: 'pendente'
+  });
+  if (error) {
+    console.error('Erro ao solicitar entrada:', error);
+    return mostrarPopup('❌ Não foi possível enviar o pedido: ' + error.message);
+  }
+  window.pedidosCampanhaUsuario = [{ campanha_id: campanhaId, user_id: session.user.id, status: 'pendente', created_at: new Date().toISOString() }, ...(window.pedidosCampanhaUsuario || [])];
+  renderizarListaCampanhas();
+  mostrarPopup('📨 Pedido enviado ao Mestre. Aguarde a aprovação.');
 }
 
 async function selecionarCampanha(campanhaId, mostrarFeedback = true) {
   const campanha = campanhasDisponiveis.find(c => c.id === campanhaId);
   if (!campanha) return;
+
+  const membro = await usuarioEhMembroDaCampanha(campanhaId);
+  if (!membro) {
+    return solicitarEntradaCampanha(campanhaId);
+  }
 
   campanhaAtual = campanha;
 
@@ -894,15 +984,22 @@ function renderizarListaCampanhas() {
     const card = document.createElement('article');
     card.className = 'card-campanha' + (campanhaAtual?.id === campanha.id ? ' ativa' : '');
     const sistema = campanha.sistemas?.nome || 'Sistema não definido';
-    const mestre = campanha.mestre_id && campanha.mestre_id === campanhaAtual?.mestre_id ? 'Mestre da campanha' : 'Campanha compartilhada';
+    const pedido = obterPedidoCampanha(campanha.id);
+    const souMestre = ehMestreGlobal || campanha.mestre_id === window.usuarioAtualId;
+    const membroConhecido = campanhaAtual?.id === campanha.id || souMestre || (window.campanhasMembroIds instanceof Set && window.campanhasMembroIds.has(campanha.id));
+    let acao = 'solicitarEntradaCampanha';
+    let textoBotao = '📨 Solicitar entrada';
+    if (campanhaAtual?.id === campanha.id) { acao = 'selecionarCampanha'; textoBotao = '✓ Campanha ativa'; }
+    else if (pedido) { acao = null; textoBotao = '⏳ Pedido pendente'; }
+    else if (membroConhecido) { acao = 'selecionarCampanha'; textoBotao = 'Entrar nesta campanha'; }
     card.innerHTML = `
       <div class="card-campanha-conteudo">
         <span class="card-campanha-icone">🏰</span>
         <div><h3>${escaparHTML(campanha.nome)}</h3>
         <p>${escaparHTML(campanha.descricao || 'Sem descrição.')}</p>
-        <span class="card-campanha-meta">⚙️ ${escaparHTML(sistema)} · ${escaparHTML(mestre)}</span></div>
+        <span class="card-campanha-meta">⚙️ ${escaparHTML(sistema)} · ${membroConhecido ? 'Você tem acesso' : 'Acesso mediante aprovação do Mestre'}</span></div>
       </div>
-      <button type="button" class="btn-selecionar-campanha" onclick="selecionarCampanha('${campanha.id}')">${campanhaAtual?.id === campanha.id ? '✓ Campanha ativa' : 'Entrar nesta campanha'}</button>`;
+      ${acao ? `<button type="button" class="btn-selecionar-campanha" onclick="${acao}('${campanha.id}')">${textoBotao}</button>` : `<button type="button" class="btn-selecionar-campanha" disabled>${textoBotao}</button>`}`;
     lista.appendChild(card);
   });
 }
@@ -1426,7 +1523,7 @@ async function carregarFichaDoUsuario(userId) {
   if (data && data.dados_ficha) {
     dadosFichaAtual = data.dados_ficha;
     renderizarFichaNaTela(dadosFichaAtual);
-    if (worldTriggerAtivo()) { worldTriggerEstado.triggersAtivos = normalizarTriggersFichaWT(dadosFichaAtual); salvarEstadoWorldTrigger(); atualizarEstadoTokenProprioWT(); renderizarPainelWTSeNecessario(); }
+    if (worldTriggerAtivo()) { worldTriggerEstado.triggersAtivos = normalizarTriggersFichaWT(dadosFichaAtual); salvarEstadoWorldTrigger(); renderizarPainelWTSeNecessario(); }
   }
 }
 
@@ -2179,8 +2276,7 @@ function transmitirMovimentoToken(token, x, y) {
       squad: token.dataset.tokenSquad || '',
       bagworm: token.dataset.tokenBagworm === 'true',
       chameleon: token.dataset.tokenChameleon === 'true',
-      trion: token.dataset.tokenTrion || null,
-      triggers: (() => { try { return JSON.parse(token.dataset.tokenTriggers || '[]'); } catch (_) { return []; } })()
+      trion: token.dataset.tokenTrion || null
     }
   });
 }

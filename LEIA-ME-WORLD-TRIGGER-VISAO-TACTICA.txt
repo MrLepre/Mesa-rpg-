@@ -1,0 +1,42 @@
+WORLD TRIGGER RPG — VISÃO TÁTICA E STEALTH
+
+Nesta etapa o mapa passa a respeitar uma camada real de visibilidade para o jogador:
+
+1. Campo de visão
+- Cada jogador possui um FOV configurável de 3 a 20 casas.
+- O padrão é 8 casas.
+- A distância é calculada em coordenadas do próprio mapa e acompanha o tamanho da grade.
+- O FOV é exibido visualmente ao redor dos agentes aliados.
+- A visão é compartilhada pelo Squad: se um aliado do mesmo Squad tiver um inimigo dentro do FOV, o Squad pode vê-lo.
+- O Mestre continua vendo todos os tokens.
+
+2. Regra normal de inimigos
+- Inimigos fora do campo de visão não aparecem no mapa do jogador.
+- Inimigos dentro do campo de visão aparecem normalmente.
+- Aliados do mesmo Squad continuam visíveis independentemente da distância.
+
+3. Bagworm
+- Bagworm ativo remove o agente do radar.
+- Fora do FOV, o agente também desaparece do mapa inimigo.
+- Dentro do FOV de um inimigo, o Bagworm não impede a visão direta: o token aparece.
+- Um Scan também pode localizar um agente com Bagworm.
+
+4. Chameleon
+- Chameleon ativo deixa o agente invisível mesmo quando ele está dentro do FOV inimigo.
+- O token não aparece no mapa inimigo nem no radar normal.
+- Scan é a exceção: depois de escaneado, o alvo fica visível para aquele jogador.
+- A descoberta do Scan é local ao jogador que executou o Scan; não entrega automaticamente a informação aos inimigos.
+
+5. Scan / Analysis
+- Scan pode localizar alvos que estejam ocultos por Bagworm ou Chameleon.
+- A descoberta é registrada no estado tático local da campanha.
+- Analysis pode aprofundar um alvo já escaneado e exibir Trion/padrão de combate.
+
+6. Compatibilidade
+- O zoom, pan, cadeado, grid e arrasto dos tokens existentes foram preservados.
+- O movimento continua usando Pointer Events e broadcast throttled.
+- O estado de FOV é salvo por campanha no navegador de cada jogador.
+- Não foi introduzida Fog of War opaca; o FOV é uma camada de visão tática, sem esconder fisicamente o mapa inteiro.
+
+Observação importante:
+- Nesta etapa o campo de visão é radial e não faz bloqueio por paredes/obstáculos desenhados na imagem do mapa. Para isso será necessário um sistema posterior de obstáculos/linhas de visão.

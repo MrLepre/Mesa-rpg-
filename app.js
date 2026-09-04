@@ -31,13 +31,16 @@ let sistemaAtual = null;
 let campanhasDisponiveis = [];
 
 // --- WORLD TRIGGER: estado tático local (Squad / Radar / Stealth) ---
+let wtRecalculoVisibilidadeAgendado = false;
+
 let worldTriggerEstado = {
   meuSquad: '',
   bagworm: false,
   chameleon: false,
   triggersAtivos: [],
   scans: {},
-  tokens: {}
+  tokens: {},
+  campoVisaoCelulas: 8
 };
 
 function obterConfiguracaoSistemaAtualWT() {
@@ -68,7 +71,7 @@ function worldTriggerAtivo() {
 
 function carregarEstadoWorldTrigger() {
   if (!worldTriggerAtivo()) {
-    worldTriggerEstado = { meuSquad:'', bagworm:false, chameleon:false, triggersAtivos:[], scans:{}, tokens:{} };
+    worldTriggerEstado = { meuSquad:'', bagworm:false, chameleon:false, triggersAtivos:[], scans:{}, tokens:{}, campoVisaoCelulas:8 };
     return;
   }
   try {
@@ -80,10 +83,11 @@ function carregarEstadoWorldTrigger() {
       chameleon: !!salvo.chameleon,
       triggersAtivos: Array.isArray(salvo.triggersAtivos) ? salvo.triggersAtivos.map(String) : [],
       scans: salvo.scans || {},
-      tokens: {}
+      tokens: {},
+      campoVisaoCelulas: Math.max(3, Math.min(20, Number(salvo.campoVisaoCelulas) || 8))
     };
   } catch (err) {
-    worldTriggerEstado = { meuSquad:'', bagworm:false, chameleon:false, triggersAtivos:[], scans:{}, tokens:{} };
+    worldTriggerEstado = { meuSquad:'', bagworm:false, chameleon:false, triggersAtivos:[], scans:{}, tokens:{}, campoVisaoCelulas:8 };
   }
 }
 
@@ -96,7 +100,8 @@ function salvarEstadoWorldTrigger() {
       bagworm: worldTriggerEstado.bagworm,
       chameleon: worldTriggerEstado.chameleon,
       triggersAtivos: worldTriggerEstado.triggersAtivos,
-      scans: worldTriggerEstado.scans
+      scans: worldTriggerEstado.scans,
+      campoVisaoCelulas: worldTriggerEstado.campoVisaoCelulas
     }));
   } catch (err) {}
 }
@@ -105,24 +110,123 @@ function obterMeuNickWT() {
   return document.getElementById('user-nick-display')?.innerText || document.getElementById('auth-nick')?.value || 'Jogador';
 }
 
+function normalizarSquadWT(valor) {
+  return String(valor || '').trim().toLowerCase();
+}
+
+function obterCoordenadasTokenWT(token) {
+  if (!token) return null;
+  const x = Number(token?.dataset?.tokenX ?? token?.x ?? token?.style?.left?.replace('%',''));
+  const y = Number(token?.dataset?.tokenY ?? token?.y ?? token?.style?.top?.replace('%',''));
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return { x, y };
+}
+
 function ehTokenDoMeuSquad(token) {
   if (!worldTriggerAtivo()) return false;
-  const squad = String(token?.dataset?.tokenSquad ?? token?.squad ?? '').trim();
-  return !!worldTriggerEstado.meuSquad && !!squad && squad.toLowerCase() === worldTriggerEstado.meuSquad.trim().toLowerCase();
+  const squad = normalizarSquadWT(token?.dataset?.tokenSquad ?? token?.squad);
+  const meuSquad = normalizarSquadWT(worldTriggerEstado.meuSquad);
+  return !!meuSquad && !!squad && squad === meuSquad;
+}
+
+function obterTokensDoMeuSquadWT() {
+  const meuSquad = normalizarSquadWT(worldTriggerEstado.meuSquad);
+  if (!meuSquad) return [];
+  return Object.values(worldTriggerEstado.tokens || {}).filter(t => normalizarSquadWT(t?.squad) === meuSquad);
+}
+
+function obterMeuTokenWT() {
+  const nick = obterMeuNickWT().trim().toLowerCase();
+  const dom = Array.from(document.querySelectorAll('.vtt-token')).find(t => String(t.dataset.tokenNome || '').trim().toLowerCase() === nick);
+  if (dom) return dom;
+  const encontrado = Object.values(worldTriggerEstado.tokens || {}).find(t => String(t.nome || '').trim().toLowerCase() === nick);
+  return encontrado || null;
+}
+
+function obterRaioCampoVisaoWT() {
+  const scaler = document.getElementById('vtt-mapa-scaler');
+  const largura = scaler?.clientWidth || scaler?.offsetWidth || 1000;
+  const celulas = Math.max(3, Math.min(20, Number(worldTriggerEstado.campoVisaoCelulas) || 8));
+  // O mapa usa coordenadas percentuais; convertemos a quantidade de casas
+  // para o mesmo espaço para que o FOV acompanhe a escala do mapa.
+  return Math.max(1, (celulas * vttGridTamanho / largura) * 100);
+}
+
+function tokenEstaNoCampoDeVisaoWT(alvo) {
+  if (!alvo || !worldTriggerAtivo()) return false;
+  const alvoPos = obterCoordenadasTokenWT(alvo);
+  if (!alvoPos) return false;
+
+  // A visibilidade do World Trigger é compartilhada pelo Squad: se qualquer
+  // agente aliado tiver o inimigo dentro do próprio FOV, o Squad o enxerga.
+  const aliados = obterTokensDoMeuSquadWT();
+  const meuToken = obterMeuTokenWT();
+  if (!aliados.length && meuToken) aliados.push(meuToken);
+  const raio = obterRaioCampoVisaoWT();
+
+  return aliados.some(aliado => {
+    const pos = obterCoordenadasTokenWT(aliado);
+    if (!pos) return false;
+    const dx = alvoPos.x - pos.x;
+    const dy = alvoPos.y - pos.y;
+    return Math.sqrt(dx * dx + dy * dy) <= raio;
+  });
+}
+
+function tokenFoiEscaneadoWT(token) {
+  const id = typeof token === 'string' ? token : token?.id || token?.dataset?.tokenId;
+  return !!id && !!worldTriggerEstado.scans?.[id];
 }
 
 function tokenEstaOcultoNoRadar(token) {
   if (!worldTriggerAtivo()) return false;
-  if (token?.dataset) return token.dataset.tokenBagworm === 'true' || token.dataset.tokenChameleon === 'true';
-  return !!token?.bagworm || !!token?.chameleon;
+  if (ehMestreGlobal) return false;
+  // Bagworm remove do radar. Chameleon só pode ser encontrado pelo Scan.
+  if (token?.dataset) {
+    if (token.dataset.tokenChameleon === 'true') return !tokenFoiEscaneadoWT(token);
+    if (token.dataset.tokenBagworm === 'true') return !tokenEstaNoCampoDeVisaoWT(token) && !tokenFoiEscaneadoWT(token);
+    return false;
+  }
+  if (token?.chameleon) return !tokenFoiEscaneadoWT(token);
+  if (token?.bagworm) return !tokenEstaNoCampoDeVisaoWT(token) && !tokenFoiEscaneadoWT(token);
+  return false;
 }
 
 function tokenVisivelParaMim(token) {
   if (!worldTriggerAtivo() || ehMestreGlobal) return true;
-  const nome = String(token?.dataset?.tokenNome || '').trim().toLowerCase();
+  const nome = String(token?.dataset?.tokenNome || token?.nome || '').trim().toLowerCase();
   if (nome === obterMeuNickWT().trim().toLowerCase()) return true;
-  if (token?.dataset?.tokenChameleon === 'true') return false;
-  return true;
+  if (ehTokenDoMeuSquad(token)) return true;
+
+  // Chameleon é invisibilidade total: FOV normal não o revela. Só o Scan.
+  if ((token?.dataset?.tokenChameleon === 'true') || token?.chameleon) {
+    return tokenFoiEscaneadoWT(token);
+  }
+
+  // Bagworm remove do radar, mas não vence a visão direta: dentro do FOV ele
+  // aparece normalmente; fora do FOV permanece oculto.
+  if ((token?.dataset?.tokenBagworm === 'true') || token?.bagworm) {
+    return tokenEstaNoCampoDeVisaoWT(token) || tokenFoiEscaneadoWT(token);
+  }
+
+  // O campo de visão passa a ser a regra normal para inimigos.
+  return tokenEstaNoCampoDeVisaoWT(token);
+}
+
+function atualizarVisibilidadeTodosTokensWT() {
+  if (!worldTriggerAtivo()) return;
+  document.querySelectorAll('.vtt-token').forEach(token => aplicarVisibilidadeTokenWT(token));
+  atualizarRadarWorldTrigger();
+  renderizarFovWorldTrigger();
+}
+
+function agendarRecalculoVisibilidadeWT() {
+  if (!worldTriggerAtivo() || wtRecalculoVisibilidadeAgendado) return;
+  wtRecalculoVisibilidadeAgendado = true;
+  requestAnimationFrame(() => {
+    wtRecalculoVisibilidadeAgendado = false;
+    atualizarVisibilidadeTodosTokensWT();
+  });
 }
 
 function atualizarRadarWorldTrigger() {
@@ -133,8 +237,7 @@ function atualizarRadarWorldTrigger() {
   const visiveis = elementos.filter(t => {
     if (!t) return false;
     if (ehMestreGlobal) return true;
-    if (tokenEstaOcultoNoRadar(t)) return false;
-    return true;
+    return !tokenEstaOcultoNoRadar(t) && tokenVisivelParaMim(t);
   });
   if (contador) contador.textContent = `${visiveis.length} detectado${visiveis.length === 1 ? '' : 's'}`;
   if (!visiveis.length) {
@@ -147,9 +250,30 @@ function atualizarRadarWorldTrigger() {
     const escSquad = escaparHTML(t.squad || 'Sem Squad');
     const tipo = aliado ? '🟦 Aliado' : '🔴 Sinal inimigo';
     const scan = worldTriggerEstado.scans[t.id];
-    const detalhe = scan ? ` · Scan: Trion ${scan.trion ?? '?'} · ${scan.padrao || 'padrão analisado'}` : '';
-    return `<div class="wt-radar-item"><strong>${tipo}</strong><span>${escNome} · ${escSquad}</span><small>${scan ? escaparHTML(detalhe.replace(' · ','')) : 'posição aproximada disponível'}</small></div>`;
+    const fov = !aliado && tokenEstaNoCampoDeVisaoWT(t);
+    const modo = scan ? '📡 Scan' : (fov ? '👁️ Campo de visão' : 'Radar');
+    const detalhe = scan ? `Trion ${scan.trion ?? '?'} · ${scan.padrao || 'posição aproximada'}` : modo;
+    return `<div class="wt-radar-item"><strong>${tipo}</strong><span>${escNome} · ${escSquad}</span><small>${escaparHTML(detalhe)}</small></div>`;
   }).join('');
+}
+
+function renderizarFovWorldTrigger() {
+  const camada = document.getElementById('vtt-fov-camada');
+  if (!camada || !worldTriggerAtivo()) return;
+  if (ehMestreGlobal) {
+    camada.innerHTML = '<div class="wt-fov-mestre">👁️ Visão tática do Mestre</div>';
+    return;
+  }
+  const raio = obterRaioCampoVisaoWT();
+  const aliados = obterTokensDoMeuSquadWT();
+  const domTokens = Array.from(document.querySelectorAll('.vtt-token'));
+  const pontos = aliados.map(t => ({x:Number(t.x), y:Number(t.y)})).filter(p => Number.isFinite(p.x) && Number.isFinite(p.y));
+  if (!pontos.length) {
+    const meu = domTokens.find(t => String(t.dataset.tokenNome || '').trim().toLowerCase() === obterMeuNickWT().trim().toLowerCase());
+    const p = obterCoordenadasTokenWT(meu);
+    if (p) pontos.push(p);
+  }
+  camada.innerHTML = pontos.map(p => `<div class="wt-fov-circulo" style="left:${p.x}%;top:${p.y}%;width:${raio*2}%;height:${raio*2}%;"></div>`).join('');
 }
 
 function normalizarTriggersFichaWT(dados){
@@ -237,6 +361,7 @@ function renderizarPainelWorldTrigger() {
         <button type="button" onclick="salvarSquadWorldTrigger()">💾 Squad</button>
         <button type="button" onclick="scanWorldTrigger()">📡 Scan</button>
         <button type="button" onclick="analysisWorldTrigger()">🔎 Analysis</button>
+        <label class="wt-fov-controle">👁️ FOV <input id="wt-fov-range" type="range" min="3" max="20" step="1" value="${worldTriggerEstado.campoVisaoCelulas || 8}" oninput="alterarCampoVisaoWorldTrigger(this.value)"> <span id="wt-fov-label">${worldTriggerEstado.campoVisaoCelulas || 8}c</span></label>
       </div>
       ${renderizarTriggersAtivosNoMapa()}
       <div class="wt-radar-lista" id="wt-radar-lista"><div class="wt-radar-vazio">Aguardando sinais...</div></div>
@@ -247,15 +372,23 @@ function salvarSquadWorldTrigger() {
   const input = document.getElementById('wt-meu-squad');
   worldTriggerEstado.meuSquad = String(input?.value || '').trim();
   salvarEstadoWorldTrigger();
-  atualizarRadarWorldTrigger();
+  atualizarVisibilidadeTodosTokensWT();
   mostrarPopup(worldTriggerEstado.meuSquad ? `👥 Squad definido: ${worldTriggerEstado.meuSquad}` : '👥 Squad removido.');
+}
+
+function alterarCampoVisaoWorldTrigger(valor) {
+  if (!worldTriggerAtivo()) return;
+  worldTriggerEstado.campoVisaoCelulas = Math.max(3, Math.min(20, Number(valor) || 8));
+  const label = document.getElementById('wt-fov-label');
+  if (label) label.textContent = `${worldTriggerEstado.campoVisaoCelulas}c`;
+  salvarEstadoWorldTrigger();
+  atualizarVisibilidadeTodosTokensWT();
 }
 
 function alternarBagwormWorldTrigger() {
   if (!worldTriggerAtivo()) return;
   if (!(worldTriggerEstado.triggersAtivos || []).some(x => String(x).toLowerCase() === 'bagworm')) return mostrarPopup('⚠️ Bagworm não está equipado na sua ficha.');
   worldTriggerEstado.bagworm = !worldTriggerEstado.bagworm;
-  if (worldTriggerEstado.bagworm) worldTriggerEstado.chameleon = false;
   salvarEstadoWorldTrigger();
   atualizarEstadoTokenProprioWT();
   renderizarPainelWTSeNecessario();
@@ -266,7 +399,6 @@ function alternarChameleonWorldTrigger() {
   if (!worldTriggerAtivo()) return;
   if (!(worldTriggerEstado.triggersAtivos || []).some(x => String(x).toLowerCase() === 'chameleon')) return mostrarPopup('⚠️ Chameleon não está equipado na sua ficha.');
   worldTriggerEstado.chameleon = !worldTriggerEstado.chameleon;
-  if (worldTriggerEstado.chameleon) worldTriggerEstado.bagworm = false;
   salvarEstadoWorldTrigger();
   atualizarEstadoTokenProprioWT();
   renderizarPainelWTSeNecessario();
@@ -282,6 +414,9 @@ function atualizarEstadoTokenProprioWT() {
     token.dataset.tokenSquad = worldTriggerEstado.meuSquad;
     token.dataset.tokenBagworm = String(!!worldTriggerEstado.bagworm);
     token.dataset.tokenChameleon = String(!!worldTriggerEstado.chameleon);
+    token.dataset.tokenX = token.style.left.replace('%','');
+    token.dataset.tokenY = token.style.top.replace('%','');
+    registrarTokenNoRadarWT(token.dataset.tokenId, token.dataset.tokenNome, parseFloat(token.style.left) || 0, parseFloat(token.style.top) || 0, token.dataset.tokenSquad, token.dataset.tokenBagworm === 'true', token.dataset.tokenChameleon === 'true', token.dataset.tokenTrion || null, (() => { try { return JSON.parse(token.dataset.tokenTriggers || '[]'); } catch (err) { return []; } })());
     aplicarVisibilidadeTokenWT(token);
     transmitirMovimentoToken(token, parseFloat(token.style.left) || 0, parseFloat(token.style.top) || 0);
   });
@@ -292,38 +427,40 @@ function aplicarVisibilidadeTokenWT(token) {
   const oculto = !tokenVisivelParaMim(token);
   token.style.visibility = oculto ? 'hidden' : 'visible';
   token.style.opacity = oculto ? '0' : '1';
+  token.style.pointerEvents = oculto ? 'none' : 'auto';
 }
 
 function registrarTokenNoRadarWT(id, nome, x, y, squad, bagworm, chameleon, trionAtual = null, triggers = []) {
   if (!worldTriggerAtivo()) return;
   worldTriggerEstado.tokens[id] = { id, nome, x, y, squad: squad || '', bagworm: !!bagworm, chameleon: !!chameleon, trion: trionAtual, triggers: Array.isArray(triggers) ? triggers : [] };
-  atualizarRadarWorldTrigger();
+  agendarRecalculoVisibilidadeWT();
 }
 
 function scanWorldTrigger() {
   if (!worldTriggerAtivo()) return;
-  const candidatos = Object.values(worldTriggerEstado.tokens || {}).filter(t => {
-    if (tokenEstaOcultoNoRadar(t)) return false;
-    return !ehTokenDoMeuSquad(t);
-  });
-  if (!candidatos.length) return mostrarPopup('📡 Scan: nenhum inimigo detectado.');
-  const alvo = candidatos[Math.floor(Math.random() * candidatos.length)];
-  worldTriggerEstado.scans[alvo.id] = { trion: alvo.trion ?? '?', padrao: 'posição aproximada' };
+  const candidatos = Object.values(worldTriggerEstado.tokens || {}).filter(t => !ehTokenDoMeuSquad(t));
+  if (!candidatos.length) return mostrarPopup('📡 Scan: nenhum inimigo detectável na mesa.');
+
+  // O Scan é a exceção que quebra o Chameleon e pode localizar um Bagworm
+  // mesmo fora do campo de visão. A descoberta é local ao operador que fez o Scan.
+  const ocultos = candidatos.filter(t => tokenEstaOcultoNoRadar(t));
+  const alvo = (ocultos.length ? ocultos : candidatos)[Math.floor(Math.random() * (ocultos.length ? ocultos : candidatos).length)];
+  worldTriggerEstado.scans[alvo.id] = { trion: alvo.trion ?? '?', padrao: 'posição aproximada', momento: Date.now() };
   salvarEstadoWorldTrigger();
-  atualizarRadarWorldTrigger();
+  atualizarVisibilidadeTodosTokensWT();
   mostrarPopup(`📡 Scan encontrou ${alvo.nome || 'um inimigo'} em posição aproximada.`);
   tocarSom('ping');
 }
 
 function analysisWorldTrigger() {
   if (!worldTriggerAtivo()) return;
-  const candidatos = Object.values(worldTriggerEstado.tokens || {}).filter(t => !tokenEstaOcultoNoRadar(t) && !ehTokenDoMeuSquad(t));
+  const candidatos = Object.values(worldTriggerEstado.tokens || {}).filter(t => !ehTokenDoMeuSquad(t));
   if (!candidatos.length) return mostrarPopup('🔎 Analysis: nenhum alvo disponível.');
   const alvo = candidatos.find(t => worldTriggerEstado.scans[t.id]) || candidatos[0];
   const trion = alvo.trion ?? '?';
-  worldTriggerEstado.scans[alvo.id] = { trion, padrao: 'combate identificado' };
+  worldTriggerEstado.scans[alvo.id] = { trion, padrao: 'combate identificado', momento: Date.now() };
   salvarEstadoWorldTrigger();
-  atualizarRadarWorldTrigger();
+  atualizarVisibilidadeTodosTokensWT();
   mostrarPopup(`🔎 Analysis: ${alvo.nome || 'alvo'} · Trion ${trion} · padrão de combate identificado.`);
 }
 
@@ -394,6 +531,9 @@ try {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  window.addEventListener('resize', () => {
+    if (worldTriggerAtivo()) atualizarVisibilidadeTodosTokensWT();
+  });
   document.body.style.overflowX = 'hidden';
   document.body.style.touchAction = 'pan-y';
 
@@ -1858,6 +1998,7 @@ function exibirMapaNaTela(url) {
     <div id="vtt-canvas" class="vtt-wrapper" style="overflow: hidden; position: relative; width: 100%; height: ${alturaMapa}; border: 1px solid #29292e; border-radius: 6px; background: #0b0d12; display: flex; justify-content: center; align-items: center; touch-action: none; cursor: ${ehMestreGlobal && vttMovimentoLivre ? 'grab' : 'crosshair'}; transition: height 0.3s ease;">
       <div id="vtt-mapa-scaler" style="position: relative; width: 100%; transform: translate(${vttPanX}px, ${vttPanY}px) scale(${vttZoom / 100}); transform-origin: center center; transition: transform 0.05s ease-out; display: flex; justify-content: center; align-items: center;">
         <img src="${escaparHTML(url)}" class="vtt-mapa-img" alt="Mapa Tático" decoding="async" fetchpriority="high" style="width: 100%; display: block; height: auto; pointer-events: none;">
+        <div id="vtt-fov-camada" class="wt-fov-camada" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:hidden;z-index:2;"></div>
         <div id="vtt-grid-camada" class="vtt-grid ${gridAtivo ? 'ativo' : ''}" style="background-size: ${vttGridTamanho}px ${vttGridTamanho}px; position: absolute; top:0; left:0; width:100%; height:100%; pointer-events: none;"></div>
         <div id="vtt-tokens-camada" style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events: none;"></div>
       </div>
@@ -1868,6 +2009,8 @@ function exibirMapaNaTela(url) {
   if (worldTriggerAtivo()) {
     renderizarPainelWTSeNecessario();
     atualizarEstadoTokenProprioWT();
+    renderizarFovWorldTrigger();
+    setTimeout(atualizarVisibilidadeTodosTokensWT, 0);
   }
 }
 
@@ -2124,8 +2267,6 @@ function confirmarCriacaoToken() {
     worldTriggerEstado.meuSquad = String(document.getElementById('wt-token-squad-input')?.value || '').trim();
     worldTriggerEstado.bagworm = !!document.getElementById('wt-token-bagworm')?.checked && worldTriggerEstado.triggersAtivos.some(x=>String(x).toLowerCase()==='bagworm');
     worldTriggerEstado.chameleon = !!document.getElementById('wt-token-chameleon')?.checked && worldTriggerEstado.triggersAtivos.some(x=>String(x).toLowerCase()==='chameleon');
-    if (worldTriggerEstado.bagworm) worldTriggerEstado.chameleon = false;
-    if (worldTriggerEstado.chameleon) worldTriggerEstado.bagworm = false;
     salvarEstadoWorldTrigger();
   }
   document.getElementById('modal-config-token').style.display = 'none';
@@ -2173,9 +2314,11 @@ function criarElementoToken(id, nome, x, y, tamanho = 45, imagem = '', hpAtual =
   token.dataset.tokenImagem = imagem;
   token.dataset.tokenHpAtual = hpAtual;
   token.dataset.tokenHpMax = hpMax;
-  token.dataset.tokenSquad = metadados.squad || token.dataset.tokenSquad || '';
-  token.dataset.tokenBagworm = String(!!metadados.bagworm || token.dataset.tokenBagworm === 'true');
-  token.dataset.tokenChameleon = String(!!metadados.chameleon || token.dataset.tokenChameleon === 'true');
+  token.dataset.tokenX = x;
+  token.dataset.tokenY = y;
+  token.dataset.tokenSquad = metadados.squad !== undefined ? String(metadados.squad || '') : (token.dataset.tokenSquad || '');
+  token.dataset.tokenBagworm = String(metadados.bagworm !== undefined ? !!metadados.bagworm : token.dataset.tokenBagworm === 'true');
+  token.dataset.tokenChameleon = String(metadados.chameleon !== undefined ? !!metadados.chameleon : token.dataset.tokenChameleon === 'true');
   token.dataset.tokenTriggers = JSON.stringify(Array.isArray(metadados.triggers) ? metadados.triggers : (token.dataset.tokenTriggers ? JSON.parse(token.dataset.tokenTriggers) : []));
   token.dataset.tokenTrion = metadados.trion ?? token.dataset.tokenTrion ?? '';
 
@@ -2196,6 +2339,7 @@ function criarElementoToken(id, nome, x, y, tamanho = 45, imagem = '', hpAtual =
   token.style.overflow = 'visible';
   token.style.touchAction = 'none';
   token.style.pointerEvents = 'auto';
+  token.style.zIndex = '5';
 
   if (imagem) {
     token.style.backgroundImage = `url(${imagem})`;
@@ -2255,6 +2399,11 @@ function obterCoordenadasTokenPeloCursor(clientX, clientY) {
 function atualizarPosicaoTokenLocal(token, x, y) {
   token.style.left = `${x}%`;
   token.style.top = `${y}%`;
+  token.dataset.tokenX = x;
+  token.dataset.tokenY = y;
+  if (worldTriggerAtivo()) {
+    registrarTokenNoRadarWT(token.dataset.tokenId, token.dataset.tokenNome, x, y, token.dataset.tokenSquad, token.dataset.tokenBagworm === 'true', token.dataset.tokenChameleon === 'true', token.dataset.tokenTrion || null, (() => { try { return JSON.parse(token.dataset.tokenTriggers || '[]'); } catch (err) { return []; } })());
+  }
 }
 
 function transmitirMovimentoToken(token, x, y) {
@@ -2297,7 +2446,8 @@ function transmitirMovimentoToken(token, x, y) {
       squad: token.dataset.tokenSquad || '',
       bagworm: token.dataset.tokenBagworm === 'true',
       chameleon: token.dataset.tokenChameleon === 'true',
-      trion: token.dataset.tokenTrion || null
+      trion: token.dataset.tokenTrion || null,
+      triggers: (() => { try { return JSON.parse(token.dataset.tokenTriggers || '[]'); } catch (err) { return []; } })()
     }
   });
 }

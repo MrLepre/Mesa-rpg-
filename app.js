@@ -545,7 +545,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   try {
     const abaSalva = localStorage.getItem('cronicas_camelot_aba');
-    if (['ficha', 'classes', 'grupo', 'mapa', 'rolagens', 'galeria'].includes(abaSalva) && abaSalva !== 'classes') {
+    if (['ficha', 'grupo', 'mapa', 'rolagens', 'galeria'].includes(abaSalva)) {
       mudarAba(abaSalva);
     }
   } catch (err) {}
@@ -933,7 +933,6 @@ function atualizarContextoCampanha() {
   if (!contexto || !nome || !sistema) return;
 
   if (!campanhaAtual) {
-    atualizarVisibilidadeAbaClasses();
     contexto.style.display = 'none';
     nome.textContent = 'Nenhuma campanha';
     sistema.textContent = 'Sistema: —';
@@ -941,7 +940,6 @@ function atualizarContextoCampanha() {
   }
 
   contexto.style.display = 'flex';
-  atualizarVisibilidadeAbaClasses();
   nome.textContent = campanhaAtual.nome || 'Campanha';
   sistema.textContent = `Sistema: ${sistemaAtual?.nome || 'Não definido'}`;
 }
@@ -1582,17 +1580,8 @@ function sistemaCamelotAtivo() {
   );
 }
 
-function atualizarVisibilidadeAbaClasses() {
-  const botao = document.getElementById('btn-aba-classes');
-  if (!botao) return;
-  const visivel = !!campanhaAtual && sistemaCamelotAtivo();
-  botao.style.display = visivel ? 'inline-flex' : 'none';
-  if (!visivel && abaAtual === 'classes') mudarAba('ficha');
-}
-
 function mudarAba(nomeAba, evento) {
-  const abasValidas = ['ficha', 'classes', 'campanhas', 'sistemas', 'grupo', 'mapa', 'rolagens', 'galeria'];
-  if (nomeAba === 'classes' && !(campanhaAtual && sistemaCamelotAtivo())) return;
+  const abasValidas = ['ficha', 'campanhas', 'sistemas', 'grupo', 'mapa', 'rolagens', 'galeria'];
   if (!abasValidas.includes(nomeAba)) return;
 
   const paineis = document.querySelectorAll('.painel');

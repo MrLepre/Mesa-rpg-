@@ -789,9 +789,15 @@
             <label>Título de Glória / Epíteto</label>
             <input type="text" id="titulo" placeholder="Ex: O Cavaleiro da Oculta Floresta">
         </div>
-        <div class="campo-texto">
-            <label>Classe</label>
-            <select id="classe">
+        <div class="bloco escolha-classe-camelot" style="grid-column: 1 / -1;">
+            <div class="bloco-header-flex">
+                <div>
+                    <h2>⚔️ Escolha sua Classe</h2>
+                    <small class="subtexto-classe-camelot">Escolha o arquétipo que representa seu personagem. A classe fica registrada na ficha.</small>
+                </div>
+                <span id="classe_selecionada_badge" class="classe-badge-camelot">Guerreiro</span>
+            </div>
+            <select id="classe" onchange="atualizarDescricaoClasse()" class="select-classe-camelot" aria-label="Classe do personagem">
                 <option value="Guerreiro">Guerreiro</option>
                 <option value="Berserker">Berserker</option>
                 <option value="Assassino">Assassino</option>
@@ -800,6 +806,16 @@
                 <option value="Bardo">Bardo</option>
                 <option value="Curandeiro">Curandeiro</option>
             </select>
+            <div id="classes_seletor_camelot" class="classes-seletor-camelot">
+                <button type="button" class="classe-opcao-camelot selecionada" data-classe="Guerreiro" onclick="selecionarClasseCamelot('Guerreiro')"><span>⚔️</span><strong>Guerreiro</strong><small>Linha de frente</small></button>
+                <button type="button" class="classe-opcao-camelot" data-classe="Berserker" onclick="selecionarClasseCamelot('Berserker')"><span>🔥</span><strong>Berserker</strong><small>DPS corpo a corpo</small></button>
+                <button type="button" class="classe-opcao-camelot" data-classe="Assassino" onclick="selecionarClasseCamelot('Assassino')"><span>🗡️</span><strong>Assassino</strong><small>Furtividade e explosão</small></button>
+                <button type="button" class="classe-opcao-camelot" data-classe="Mago" onclick="selecionarClasseCamelot('Mago')"><span>🔮</span><strong>Mago</strong><small>Controle arcano</small></button>
+                <button type="button" class="classe-opcao-camelot" data-classe="Arqueiro" onclick="selecionarClasseCamelot('Arqueiro')"><span>🏹</span><strong>Arqueiro</strong><small>Combate à distância</small></button>
+                <button type="button" class="classe-opcao-camelot" data-classe="Bardo" onclick="selecionarClasseCamelot('Bardo')"><span>🎵</span><strong>Bardo</strong><small>Suporte e inspiração</small></button>
+                <button type="button" class="classe-opcao-camelot" data-classe="Curandeiro" onclick="selecionarClasseCamelot('Curandeiro')"><span>✨</span><strong>Curandeiro</strong><small>Cura e suporte</small></button>
+            </div>
+            <small id="descricao_classe" class="descricao-classe-camelot">Linha de frente, tanque ou causador de dano físico. Atributos principais: Força ou Destreza, seguidos por Constituição.</small>
         </div>
     </div>
 
@@ -1110,13 +1126,43 @@
 // Sinergias definidas para Camelot. As relações de 2 são exatamente as
 // maiores sinergias fornecidas. As relações restantes foram completadas de
 // forma simétrica: três pares sem sinergia (0) e as demais relações com 1.
+const classesCamelot = {
+    Guerreiro: 'Linha de frente, tanque ou causador de dano físico. Atributos principais: Força ou Destreza, seguidos por Constituição.',
+    Berserker: 'DPS corpo a corpo de alto risco e alta recompensa; troca integridade física ou vida por poder ofensivo.',
+    Assassino: 'Furtividade extrema, dano explosivo, venenos e alta mobilidade para aproximar, atacar e reposicionar-se.',
+    Mago: 'Controlador e utilitário arcano. Inteligência determina a potência e a CD das magias.',
+    Arqueiro: 'Combate à distância. Destreza, Agilidade e Percepção focam precisão e força dos disparos.',
+    Bardo: 'Suporte principal, controlador e rosto do grupo. Carisma define o poder das magias e da inspiração.',
+    Curandeiro: 'Suporte, cura e líder de combate. Sabedoria controla a eficácia das magias e curas.'
+};
+
+function selecionarClasseCamelot(nome) {
+    const select = document.getElementById('classe');
+    if (!select || !classesCamelot[nome]) return;
+    select.value = nome;
+    atualizarDescricaoClasse();
+}
+
+function atualizarDescricaoClasse() {
+    const select = document.getElementById('classe');
+    const desc = document.getElementById('descricao_classe');
+    const badge = document.getElementById('classe_selecionada_badge');
+    if (!select) return;
+    const nome = select.value;
+    if (desc) desc.textContent = classesCamelot[nome] || '';
+    if (badge) badge.textContent = nome;
+    document.querySelectorAll('.classe-opcao-camelot').forEach(btn => {
+        btn.classList.toggle('selecionada', btn.dataset.classe === nome);
+    });
+}
+
 const mapaSinergias = {
-    "Fogo": { Fogo: 3, Raio: 2, Terra: 0, Água: 1, Gelo: 1, Vento: 2 },
-    "Raio": { Fogo: 2, Raio: 3, Terra: 2, Água: 1, Gelo: 0, Vento: 1 },
-    "Terra": { Fogo: 0, Raio: 2, Terra: 3, Água: 2, Gelo: 2, Vento: 2 },
-    "Água": { Fogo: 1, Raio: 1, Terra: 2, Água: 3, Gelo: 2, Vento: 0 },
-    "Gelo": { Fogo: 1, Raio: 0, Terra: 2, Água: 2, Gelo: 3, Vento: 2 },
-    "Vento": { Fogo: 2, Raio: 1, Terra: 2, Água: 0, Gelo: 2, Vento: 3 }
+    Fogo:  { Fogo: 3, Raio: 2, Vento: 2, Terra: 0, Água: 1, Gelo: 1 },
+    Raio:  { Fogo: 2, Raio: 3, Terra: 2, Vento: 1, Água: 1, Gelo: 0 },
+    Terra: { Fogo: 0, Raio: 2, Terra: 3, Vento: 2, Água: 2, Gelo: 2 },
+    Água:  { Fogo: 1, Raio: 1, Terra: 2, Vento: 0, Água: 3, Gelo: 2 },
+    Gelo:  { Fogo: 1, Raio: 0, Terra: 2, Vento: 2, Água: 2, Gelo: 3 },
+    Vento: { Fogo: 2, Raio: 1, Terra: 2, Vento: 3, Água: 0, Gelo: 2 }
 };
 
 const periciasCatalogo = [
@@ -1350,6 +1396,7 @@ function carregarDadosFicha(dados) {
     atualizarElementos();
     atualizarOrigemPericias();
     atualizarProgressaoFicha();
+    atualizarDescricaoClasse();
 }
 
 function salvarLocal() {
@@ -1402,6 +1449,7 @@ window.onload = function() {
     construirListaPericias();
     calcularTudo();
     atualizarElementos();
+    atualizarDescricaoClasse();
     atualizarPorcentagemEnergia(document.getElementById('energia_porcentagem').value);
     atualizarProgressaoFicha();
     inicializarIntegracaoMesa();

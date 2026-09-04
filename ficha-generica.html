@@ -50,26 +50,36 @@ function montarSeletorTriggersWorldTrigger(){
  const arsenal=obterArsenalWorldTrigger().filter(t=>String(t.nome||'').toLowerCase()!=='bail out');
  const salvos=normalizarTriggersSalvosWT(dadosCarregados);
  const selecionados=new Set(salvos.map(x=>x.toLowerCase()));
- const principais=arsenal.slice(0, Math.max(4, Math.ceil(arsenal.length/2)));
- const secundarios=arsenal.slice(Math.max(4, Math.ceil(arsenal.length/2)));
- const renderGrupo=(titulo,lista,grupo)=>`<div class="wt-slot-group"><h3>${esc(titulo)} <span class="wt-slots">4 espaços</span></h3>${lista.map((t,i)=>{
-   const id=`wt_trigger_${grupo}_${i}`; const ativo=selecionados.has(String(t.nome||'').toLowerCase());
+ const ladosSalvos=dadosCarregados?.wt_trigger_lados && typeof dadosCarregados.wt_trigger_lados==='object' ? dadosCarregados.wt_trigger_lados : {};
+ const principalSalvo=new Set(Array.isArray(ladosSalvos.principal)?ladosSalvos.principal.map(String).map(x=>x.toLowerCase()):[]);
+ const secundarioSalvo=new Set(Array.isArray(ladosSalvos.secundario)?ladosSalvos.secundario.map(String).map(x=>x.toLowerCase()):[]);
+ const renderGrupo=(titulo,grupo)=>`<div class="wt-slot-group"><h3>${esc(titulo)} <span class="wt-slots">4 espaços</span></h3>${arsenal.map((t,i)=>{
+   const nome=String(t.nome||''); const chave=nome.toLowerCase();
+   const id=`wt_trigger_${grupo}_${i}`;
+   const ativoSalvo=grupo==='principal' ? (principalSalvo.size?principalSalvo.has(chave):selecionados.has(chave)) : (secundarioSalvo.size?secundarioSalvo.has(chave):false);
    const custo=t.custo??t.custoBase??'—'; const efeito=t.efeito||t.tecnicas?.[0]?.[2]||'';
-   return `<label class="wt-trigger-option"><input type="checkbox" class="wt-trigger-check" data-trigger-name="${esc(t.nome)}" data-trigger-slot="${grupo}" id="${id}" ${ativo?'checked':''} onchange="limitarSlotsWorldTrigger()"><span><b>${esc(t.nome)}</b><small>${esc(t.categoria||grupo)} · Custo: ${esc(custo)}${efeito?' · '+esc(efeito):''}</small></span></label>`;
+   return `<label class="wt-trigger-option"><input type="checkbox" class="wt-trigger-check" data-trigger-name="${esc(nome)}" data-trigger-slot="${grupo}" id="${id}" ${ativoSalvo?'checked':''} onchange="limitarSlotsWorldTrigger()"><span><b>${esc(nome)}</b><small>${esc(t.categoria||'Trigger')} · Custo: ${esc(custo)}${efeito?' · '+esc(efeito):''}</small></span></label>`;
  }).join('')}</div>`;
- return `<div class="wt-loadout"><div class="wt-loadout-head"><strong>⚔️ Trigger Holder</strong><span id="wt-trigger-contador" class="wt-slots">0 / 8 espaços</span></div><small>Escolha os Triggers equipados pelo agente. O VTT usa 8 espaços: 4 principais + 4 secundários. Esse limite é uma regra de implementação do VTT; o PDF do sistema não especifica a quantidade de slots.</small><div class="wt-trigger-slots">${renderGrupo('Lado Principal',principais,'principal')}${renderGrupo('Lado Secundário',secundarios,'secundario')}</div><div id="wt-trigger-alerta" class="wt-loadout-alert"></div></div>`;
+ return `<div class="wt-loadout"><div class="wt-loadout-head"><strong>⚔️ Trigger Holder</strong><span id="wt-trigger-contador" class="wt-slots">0 / 8 espaços</span></div><small>Equipe até 8 Triggers: 4 no Lado Principal e 4 no Lado Secundário. O PDF do sistema não informa a quantidade de slots; os 8 espaços são uma regra de implementação do VTT inspirada no formato de Trigger Holder.</small><div class="wt-trigger-slots">${renderGrupo('Lado Principal','principal')}${renderGrupo('Lado Secundário','secundario')}</div><div id="wt-trigger-alerta" class="wt-loadout-alert"></div></div>`;
 }
 function limitarSlotsWorldTrigger(){
  const checks=[...document.querySelectorAll('.wt-trigger-check')];
  const porLado={principal:0,secundario:0};
- checks.forEach(c=>{if(c.checked) porLado[c.dataset.triggerSlot]=(porLado[c.dataset.triggerSlot]||0)+1;});
- checks.forEach(c=>{c.disabled=!c.checked && (porLado[c.dataset.triggerSlot]||0)>=4;});
+ const selecionados={};
+ checks.forEach(c=>{ if(c.checked){ const lado=c.dataset.triggerSlot; porLado[lado]=(porLado[lado]||0)+1; (selecionados[lado] ||= new Set()).add(String(c.dataset.triggerName||'').toLowerCase()); }});
+ checks.forEach(c=>{
+   const lado=c.dataset.triggerSlot; const nome=String(c.dataset.triggerName||'').toLowerCase();
+   const outro=lado==='principal'?'secundario':'principal';
+   c.disabled=!c.checked && ((porLado[lado]||0)>=4 || selecionados[outro]?.has(nome));
+ });
  const total=porLado.principal+porLado.secundario;
  const contador=document.getElementById('wt-trigger-contador'); if(contador) contador.textContent=`${total} / 8 espaços`;
  const alerta=document.getElementById('wt-trigger-alerta'); if(alerta) alerta.textContent=total>=8?'⚔️ Trigger Holder completo.':(porLado.principal>=4||porLado.secundario>=4?'Um dos lados está completo (4/4).':'');
 }
 function obterTriggersSelecionadosWT(){
- return [...document.querySelectorAll('.wt-trigger-check:checked')].map(e=>e.dataset.triggerName).filter(Boolean);
+ const principal=[...document.querySelectorAll('.wt-trigger-check[data-trigger-slot="principal"]:checked')].map(e=>e.dataset.triggerName).filter(Boolean);
+ const secundario=[...document.querySelectorAll('.wt-trigger-check[data-trigger-slot="secundario"]:checked')].map(e=>e.dataset.triggerName).filter(Boolean);
+ return {principal,secundario,ativos:[...new Set([...principal,...secundario])],total:principal.length+secundario.length};
 }
 function montarPainelWorldTrigger(){
  if(!worldTriggerAtivo()) return '';
@@ -103,7 +113,7 @@ function gerarTrion(){
 function ajustarTrion(delta){const e=document.getElementById('trion_atual');const max=Number(document.getElementById('trion_maximo')?.value||0);if(!e)return;let v=Number(e.value||0)+delta;e.value=Math.max(0,Math.min(max||9999,v));atualizarTrionVisual()}
 function abrirGastoTrion(){const maxAcao=Number(config?.modulos?.trion?.limiteAcao||5);const valor=prompt(`Quanto Trion gastar nesta ação? (0–${maxAcao})`);if(valor===null)return;const n=Number(valor);if(!Number.isInteger(n)||n<0||n>maxAcao)return alert(`Escolha um valor entre 0 e ${maxAcao}.`);const e=document.getElementById('trion_atual');const atual=Number(e?.value||0);if(n>atual)return alert('Trion insuficiente.');if(e)e.value=atual-n;atualizarTrionVisual();const efeito=n<=2?'+1 no teste':(n>=5?'-1 na próxima ação':'sem modificador');alert(`⚡ Gastou ${n} Trion. ${efeito}.`)}
 function aplicarTema(t){document.documentElement.style.setProperty('--gold',t.corPrimaria||'#c5a059');document.documentElement.style.setProperty('--gold2',t.corPrimaria||'#f3d075');document.documentElement.style.setProperty('--bg',t.corFundo||'#080a0f');document.documentElement.style.setProperty('--panel',t.corPainel||'#151821')}
-function obter(){const out={_sistema_id:sistema?.id,_sistema_nome:sistema?.nome,_modo:modo};document.querySelectorAll('#conteudo input,#conteudo textarea,#conteudo select').forEach(e=>{if(e.disabled&&!e.readOnly)return;out[e.id]=e.type==='checkbox'?e.checked:e.value});return out}
+function obter(){const out={_sistema_id:sistema?.id,_sistema_nome:sistema?.nome,_modo:modo};document.querySelectorAll('#conteudo input,#conteudo textarea,#conteudo select').forEach(e=>{if(e.disabled&&!e.readOnly)return;out[e.id]=e.type==='checkbox'?e.checked:e.value});if(ehWorldTrigger()){const wt=obterTriggersSelecionadosWT();out.wt_triggers_ativos=wt.ativos;out.wt_trigger_lados={principal:wt.principal,secundario:wt.secundario};out.triggers_equipados=wt.ativos.join(', ');}return out}
 function resolverRolagem(expr){const vals=montarMapaValores();return String(expr||'').replace(/\b[A-Za-z_][A-Za-z0-9_]*\b/g,m=>Object.prototype.hasOwnProperty.call(vals,m.toUpperCase())?String(vals[m.toUpperCase()]):m)}
 function rolarCampo(id){const c=catalogo(config).find(x=>x.id===id);if(!c?.rolagem)return;const expr=resolverRolagem(c.rolagem);window.parent.postMessage({type:'cronicas-camelot-rolar-expressao',expressao:expr,descricao:`${sistema.nome}: ${c.nome}`},location.origin)}
 function enviar(){window.parent.postMessage({type:'cronicas-camelot-ficha-pronta',dados:obter(),modo, sistema_id:sistema?.id},location.origin)}

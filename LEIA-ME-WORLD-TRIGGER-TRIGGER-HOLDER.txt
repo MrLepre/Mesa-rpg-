@@ -1,0 +1,20 @@
+CORREÇÃO — TRIGGER HOLDER WORLD TRIGGER
+
+A ficha World Trigger agora reconhece o sistema também pelo nome "World Trigger", mesmo se configuracao.tipo estiver ausente.
+
+O Trigger Holder exibe todos os Triggers equipáveis em uma tabela com duas caixas por Trigger:
+- Principal
+- Secundário
+
+Limites de implementação do VTT:
+- 4 Triggers no lado Principal
+- 4 Triggers no lado Secundário
+- 8 Triggers no total
+- um Trigger só pode ocupar um lado
+- Bail Out não ocupa slot
+
+Ao salvar/enviar a ficha são gravados:
+- wt_triggers_ativos
+- wt_trigger_lados
+
+A antiga área de texto "Triggers equipados" deixa de aparecer para World Trigger.

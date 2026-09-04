@@ -1,0 +1,32 @@
+WORLD TRIGGER RPG — IMPLANTAÇÃO TÁTICA
+
+Esta versão parte da Etapa 4 aceita do VTT e mantém as mecânicas atuais do mapa.
+
+Implantado nesta etapa:
+- Sistema World Trigger RPG na biblioteca.
+- Ficha genérica especializada com Centro de Trion.
+- Squad por campanha/personagem (estado local do jogador).
+- Painel tático World Trigger na aba Mapa.
+- Radar com identificação de aliados/inimigos.
+- Bagworm: remove o agente do radar.
+- Chameleon: oculta o token dos demais jogadores; Mestre continua vendo.
+- Scan e Analysis no painel.
+- Estado de Squad/stealth separado por campanha no navegador.
+- Metadados de Squad/Bagworm/Chameleon transmitidos junto ao token.
+
+Não foi alterado:
+- Zoom/Pan do mapa.
+- Cadeado do mapa.
+- Grelha.
+- Arrasto dos tokens.
+- HP dos tokens.
+- Galeria.
+- Rolagens existentes.
+- Ficha legada de Crônicas de Camelot.
+
+Próxima camada recomendada:
+1. Squad administrativo (Mestre define membros/operador).
+2. Radar por informação, com posição aproximada e detecção.
+3. Triggers/ações de combate.
+4. Operador (Scan, Analysis, Alert, Direction) como papel real.
+5. Rank Wars e pontuação.

@@ -113,6 +113,7 @@
           <p class="subtexto-galeria">Crie sistemas reutilizáveis. O sistema define a estrutura da ficha; a campanha guarda os personagens.</p>
         </div>
         <button id="btn-novo-sistema" class="btn-nova-campanha" style="display:none;" onclick="abrirNovoSistema()">＋ Novo Sistema</button>
+        <button id="btn-instalar-world-trigger" class="btn-nova-campanha" style="display:none; margin-left:8px;" onclick="instalarSistemaWorldTrigger()">🌐 Adicionar World Trigger RPG</button>
       </div>
       <div id="painel-novo-sistema" class="card-secao card-nova-campanha" style="display:none;">
         <h3 id="titulo-editor-sistema">👑 Criar novo sistema</h3>

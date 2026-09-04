@@ -321,8 +321,10 @@ function atualizarInterfaceAuth(user) {
     ehMestreGlobal = (user.email || '').toLowerCase() === 'mestre@rpg.local';
     const btnAbaSistemas = document.getElementById('btn-aba-sistemas');
     const btnNovoSistema = document.getElementById('btn-novo-sistema');
+    const btnInstalarWT = document.getElementById('btn-instalar-world-trigger');
     if (btnAbaSistemas) btnAbaSistemas.style.display = ehMestreGlobal ? 'inline-flex' : 'none';
     if (btnNovoSistema) btnNovoSistema.style.display = ehMestreGlobal ? 'inline-flex' : 'none';
+    if (btnInstalarWT) btnInstalarWT.style.display = ehMestreGlobal ? 'inline-flex' : 'none';
     if (ehMestreGlobal) {
       if (badgeMestre) badgeMestre.style.display = 'inline-block';
       if (painelMapaMestre) painelMapaMestre.style.display = 'block';
@@ -547,7 +549,32 @@ async function selecionarCampanha(campanhaId, mostrarFeedback = true) {
   if (!campanha) return;
 
   campanhaAtual = campanha;
+
+  // O relacionamento campanhas -> sistemas pode estar nulo/órfão em bancos
+  // que foram migrados antes da criação do sistema legado de Camelot.
+  // Resolva o sistema novamente pelo ID antes de abrir qualquer ficha.
   sistemaAtual = campanha.sistemas || null;
+  if (!sistemaAtual && campanha.sistema_id && supabaseClient) {
+    const { data: sistemaPorId } = await supabaseClient
+      .from('sistemas')
+      .select('id,nome,descricao,configuracao')
+      .eq('id', campanha.sistema_id)
+      .maybeSingle();
+    sistemaAtual = sistemaPorId || null;
+  }
+
+  // Compatibilidade: a campanha original de Crônicas de Camelot usa a ficha
+  // legada. Se o vínculo do sistema estiver quebrado, ainda abrimos a ficha
+  // correta em vez de mandar o jogador para ficha-generica com sistema vazio.
+  if (!sistemaAtual && /crônicas? de camelot/i.test(campanha.nome || '')) {
+    sistemaAtual = {
+      id: campanha.sistema_id || 'legacy-camelot',
+      nome: 'Crônicas de Camelot',
+      descricao: 'Sistema original de Crônicas de Camelot.',
+      configuracao: { tipo: 'legado', ficha: 'ficha-editor.html' }
+    };
+  }
+
   salvarCampanhaLocalmente();
   atualizarContextoCampanha();
   renderizarListaCampanhas();
@@ -667,7 +694,8 @@ const CAMPOS_SISTEMA_PADRAO = {
   pericias: [{nome:'Percepção', atributo:'FOR'}],
   campos: [{nome:'História', tipo:'area'}]
 };
-let builderSistema = { dados: [], atributos: [], recursos: [], pericias: [], campos: [], secoes: [] };
+let builderSistema = { dados: [], atributos: [], recursos: [], pericias: [], campos: [], secoes: [], especial: {} };
+let builderTipoSistema = 'generico';
 let builderEtapaAtual = 1;
 
 function normalizarCampoBuilder(campo, fallbackTipo='texto') {
@@ -723,12 +751,14 @@ function normalizarSecao(secao) {
 
 function iniciarBuilderSistema(config = null) {
   const c = config || CAMPOS_SISTEMA_PADRAO;
+  builderTipoSistema = config?.tipo || 'generico';
   builderSistema = {
     dados: Array.isArray(config?.dados) ? [...config.dados] : ['d20'],
     atributos: Array.isArray(c.atributos) ? c.atributos.map(x=>normalizarCampoBuilder(x,'numero')) : [],
     recursos: Array.isArray(c.recursos) ? c.recursos.map(x=>normalizarCampoBuilder(x,x.tipo||'numero')) : [],
     pericias: Array.isArray(c.pericias) ? c.pericias.map(x=>normalizarCampoBuilder(x,'numero')) : [],
     campos: Array.isArray(c.campos) ? c.campos.map(x=>normalizarCampoBuilder(x,x.tipo||'texto')) : [],
+    especial: config ? JSON.parse(JSON.stringify({modulos:config.modulos||{},arsenal:config.arsenal||{},rankWars:config.rankWars||{}})) : {},
     secoes: Array.isArray(config?.secoes) && config.secoes.length ? config.secoes.map(normalizarSecao) : []
   };
   if (!builderSistema.secoes.length) builderSistema.secoes = gerarLayoutPadrao();
@@ -866,6 +896,98 @@ document.addEventListener('input', function(e){
   if(e.target?.id==='novo-sistema-nome' && builderEtapaAtual===3) renderizarPreviewBuilder();
 });
 
+function criarConfiguracaoWorldTrigger(){
+  const numero = (id,nome,sigla,valor='',extra={}) => ({id,nome,sigla,tipo:'numero',largura:1,obrigatorio:false,calculado:false,placeholder:'',valor_padrao:valor,ajuda:'',opcoes:[],valor_maximo:'',formula:'',rolagem:'',...extra});
+  const texto = (id,nome,extra={}) => ({id,nome,tipo:'texto',largura:1,obrigatorio:false,calculado:false,placeholder:'',valor_padrao:'',ajuda:'',opcoes:[],valor_maximo:'',formula:'',rolagem:'',...extra});
+  const area = (id,nome,extra={}) => ({id,nome,tipo:'area',largura:2,obrigatorio:false,calculado:false,placeholder:'',valor_padrao:'',ajuda:'',opcoes:[],valor_maximo:'',formula:'',rolagem:'',...extra});
+  return {
+    versao:4,
+    tipo:'world_trigger',
+    dados:['d6','d10'],
+    modulos:{
+      trion:{ativo:true,criacao:'1d10+2',multiplicador:5,limiteAcao:5,regeneracao:1,eficienciaAte:2,bonusEficiencia:1,sobrecargaApartir:5,penalidadeSobrecarga:-1},
+      triggers:{ativo:true},
+      squads:{ativo:true,minMembros:3,maxMembros:4},
+      radar:{ativo:true},
+      visibilidade:{ativo:true,porSquad:true},
+      bagworm:{ativo:true,custoPorTurno:1},
+      chameleon:{ativo:true,custoPorTurno:2},
+      operador:{ativo:true},
+      rankWars:{ativo:true},
+      eventosDinamicos:{ativo:true}
+    },
+    arsenal:{
+      atacantes:[
+        {nome:'Kogetsu',categoria:'Atacante',custoBase:1,tecnicas:[['Corte Reto',1,'Ataque direto. +1 no teste se for frontal.'],['Tornado',2,'Corte em arco. Atinge múltiplos alvos próximos.'],['Senkū',4,'Corte à distância. Ignora cobertura leve.'],['Flash',3,'Avança rapidamente e ataca. Ganha prioridade na ação.']]},
+        {nome:'Scorpion',categoria:'Atacante',custoBase:1,tecnicas:[['Morfia',1,'Altera a forma da lâmina livremente.'],['Agulha',2,'Ataque perfurante. +1 contra defesa.'],['Mantis',3,'Combina duas lâminas. +2 no dano.'],['Armadura Viva',2,'Forma proteção temporária.']]},
+        {nome:'Raygust',categoria:'Atacante',custoBase:1,tecnicas:[['Modo Escudo',1,'Reduz dano recebido em -2.'],['Thruster',3,'Avanço explosivo.'],['Âncora',2,'Não pode ser empurrado ou derrubado.'],['Captura',3,'Prende o alvo temporariamente.']]}
+      ],
+      armeiros:[
+        {nome:'Asteroid',custo:'1 por disparo',efeito:'dano bruto puro'},
+        {nome:'Hound',custo:2,efeito:'projéteis seguem o alvo'},
+        {nome:'Viper',custo:'2–3',efeito:'trajetória definida pelo jogador'},
+        {nome:'Meteor',custo:3,efeito:'dano em área'}
+      ],
+      snipers:[
+        {nome:'Lightning',custo:2,efeito:'tiro rápido, difícil de evitar'},
+        {nome:'Egret',custo:3,efeito:'tiro equilibrado'},
+        {nome:'Ibis',custo:4,efeito:'destruição massiva'}
+      ],
+      opcionais:[
+        {nome:'Shield',custo:'1–2',efeito:'Cria barreira de Trion'},
+        {nome:'Bagworm',custo:'1 por turno',efeito:'Remove usuário do radar'},
+        {nome:'Chameleon',custo:'2 por turno',efeito:'Invisibilidade total'},
+        {nome:'Spider',custo:2,efeito:'Cria fios no cenário'},
+        {nome:'Lead Bullet',custo:3,efeito:'Projétil não causa dano, mas pesa o alvo'},
+        {nome:'Thruster',custo:2,efeito:'Impulso de movimento'},
+        {nome:'Bail Out',custo:'especial',efeito:'Retirada automática do combate'}
+      ]
+    },
+    rankWars:{composicao:'2–4 combatentes + 1 operador',squadsSimultaneos:'3–4',objetivo:'Pontuar melhor que os outros squads',pontuacao:{abate:1,ultimaEquipe:2,assistencia:0.5,controleArea:1,execucaoTatica:1,firstBlood:1,eliminacaoLimpa:1},ambientes:{noite:'-1 percepção',neve:'reduz mobilidade',chuva:'reduz precisão',nevoa:'limita alcance'},eventos:['Blackout','Colapso de área','Interferência']},
+    atributos:[],
+    recursos:[
+      numero('trion_atual','Trion Atual','TRION',0,{valor_maximo:1000,ajuda:'Recurso de combate. Regenera 1 por turno.'}),
+      numero('trion_maximo','Trion Máximo','TRION MAX',0,{calculado:true,formula:'TRION_BASE * 5',ajuda:'Resultado inicial de Trion multiplicado por 5.'}),
+      numero('trion_base','Resultado de Trion','TRION BASE',0,{ajuda:'Resultado de 1d10 + 2 usado para determinar o Trion.'})
+    ],
+    pericias:[],
+    campos:[
+      texto('squad','Squad',{ajuda:'Equipe do agente. Aliados do mesmo Squad podem compartilhar informações.'}),
+      texto('funcao','Função',{placeholder:'Atacante, Artilheiro, Sniper, Operador...'}),
+      texto('estilo_squad','Estilo do Squad',{placeholder:'Ofensiva, Defensiva, Tática, Móvel ou Híbrida'}),
+      area('objetivo','Objetivo do personagem',{largura:2}),
+      area('medo','Medo',{largura:2}),
+      area('limite','Limite',{largura:2}),
+      area('side_effect','Side Effect',{largura:2,ajuda:'Vantagem especial do agente.'}),
+      area('side_effect_limitacao','Limitação do Side Effect',{largura:2,ajuda:'Todo Side Effect deve possuir uma limitação obrigatória.'}),
+      area('triggers_equipados','Triggers equipados',{largura:2,placeholder:'Liste os Triggers utilizados pelo agente.'})
+    ],
+    secoes:[
+      {titulo:'Identidade do Agente',icone:'🧑‍✈️',colunas:2,campos:['squad','funcao','estilo_squad']},
+      {titulo:'Trion',icone:'🔋',colunas:3,campos:['trion_base','trion_maximo','trion_atual']},
+      {titulo:'Perfil',icone:'🎭',colunas:2,campos:['objetivo','medo','limite','side_effect','side_effect_limitacao']},
+      {titulo:'Arsenal',icone:'⚔️',colunas:1,campos:['triggers_equipados']}
+    ],
+    tema:{corPrimaria:'#39b8ff',corFundo:'#071018',corPainel:'#0d1822'},
+    ficha:'ficha-generica.html'
+  };
+}
+
+async function instalarSistemaWorldTrigger(){
+  if(!ehMestreGlobal || !supabaseClient) return;
+  const existente = await supabaseClient.from('sistemas').select('id,nome').ilike('nome','World Trigger RPG').maybeSingle();
+  if(existente.data){
+    mostrarPopup('🌐 World Trigger RPG já está na biblioteca.');
+    return;
+  }
+  const user=(await supabaseClient.auth.getUser()).data.user;
+  const config=criarConfiguracaoWorldTrigger();
+  const {data,error}=await supabaseClient.from('sistemas').insert({nome:'World Trigger RPG',descricao:'RPG de Trion focado em estratégia, leitura, decisão, squads, radar e Rank Wars.',configuracao:config,criado_por:user?.id}).select().single();
+  if(error){console.error(error);mostrarPopup('❌ Não foi possível adicionar o World Trigger RPG: '+error.message);return;}
+  await carregarSistemas();
+  mostrarPopup('🌐 World Trigger RPG adicionado à biblioteca!');
+}
+
 async function carregarSistemas(){
   if(!supabaseClient) return;
   const lista=document.getElementById('lista-sistemas'); if(!lista) return;
@@ -875,7 +997,7 @@ async function carregarSistemas(){
   (data||[]).forEach(s=>{
     const card=document.createElement('article'); card.className='card-sistema'+(s.configuracao?.tipo==='legado'?' legado':'');
     const cfg=s.configuracao||{};
-    const resumo=[`${(cfg.dados||[]).length} dados`,`${(cfg.atributos||[]).length} atributos`,`${(cfg.recursos||[]).length} recursos`,`${(cfg.pericias||[]).length} perícias`].join(' · ');
+    const modulosWT=cfg.tipo==='world_trigger'?['🔋 Trion','👥 Squads','📡 Radar','👻 Stealth','🏆 Rank Wars']:[]; const resumo=modulosWT.length?modulosWT.join(' · '):[`${(cfg.dados||[]).length} dados`,`${(cfg.atributos||[]).length} atributos`,`${(cfg.recursos||[]).length} recursos`,`${(cfg.pericias||[]).length} perícias`].join(' · ');
     card.innerHTML=`<div class="card-sistema-topo"><div><h3>⚙️ ${escaparHTML(s.nome)}</h3><p>${escaparHTML(s.descricao||'Sem descrição.')}</p><div class="card-sistema-meta">${escaparHTML(resumo)}</div></div>${cfg.tipo==='legado'?'<span class="badge-legado">LEGADO</span>':''}</div><div class="card-sistema-acoes"><button class="btn-sistema-acao" onclick="abrirFichaDoSistema('${s.id}')">📖 Abrir Ficha</button>${ehMestreGlobal?`<button class="btn-sistema-acao" onclick="editarSistema('${s.id}')">✏️ Editar</button>`:''}</div>`;
     lista.appendChild(card);
   });
@@ -891,7 +1013,7 @@ async function salvarSistema(){
   if(!ehMestreGlobal) return; const nome=document.getElementById('novo-sistema-nome')?.value.trim(); if(!nome)return mostrarPopup('❌ Informe o nome do sistema.');
   const descricao=document.getElementById('novo-sistema-descricao')?.value.trim()||''; const id=document.getElementById('sistema-editando-id')?.value||null;
   sincronizarIdsComLayout();
-  const config={versao:3,tipo:'generico',dados:[...builderSistema.dados],atributos:builderSistema.atributos.map(x=>({...x})),recursos:builderSistema.recursos.map(x=>({...x})),pericias:builderSistema.pericias.map(x=>({...x})),campos:builderSistema.campos.map(x=>({...x})),secoes:builderSistema.secoes.map(x=>({...x,campos:[...x.campos]})),tema:{corPrimaria:document.getElementById('sistema-cor-primaria')?.value||'#c5a059',corFundo:document.getElementById('sistema-cor-fundo')?.value||'#080a0f',corPainel:document.getElementById('sistema-cor-painel')?.value||'#151821'},ficha:'ficha-generica.html'};
+  const config={versao:builderTipoSistema==='world_trigger'?4:3,tipo:builderTipoSistema,dados:[...builderSistema.dados],atributos:builderSistema.atributos.map(x=>({...x})),recursos:builderSistema.recursos.map(x=>({...x})),pericias:builderSistema.pericias.map(x=>({...x})),campos:builderSistema.campos.map(x=>({...x})),secoes:builderSistema.secoes.map(x=>({...x,campos:[...x.campos]})),tema:{corPrimaria:document.getElementById('sistema-cor-primaria')?.value||'#c5a059',corFundo:document.getElementById('sistema-cor-fundo')?.value||'#080a0f',corPainel:document.getElementById('sistema-cor-painel')?.value||'#151821'},ficha:'ficha-generica.html',...(builderSistema.especial||{})};
   let q=supabaseClient.from('sistemas'); const payload={nome,descricao,configuracao:config,updated_at:new Date().toISOString()};
   const result=id?await q.update(payload).eq('id',id).select().single():await q.insert({...payload,criado_por:(await supabaseClient.auth.getUser()).data.user?.id}).select().single();
   if(result.error)return mostrarPopup('❌ Erro ao salvar sistema: '+result.error.message);
@@ -1048,15 +1170,20 @@ function renderizarFichaNaTela(dados) {
     </div>`;
 }
 
+function ehFichaLegadaAtual() {
+  return sistemaAtual?.configuracao?.tipo === 'legado' || sistemaAtual?.configuracao?.ficha === 'ficha-editor.html';
+}
+
 function abrirCriadorFicha() {
   const modal = document.getElementById('modal-criador-ficha');
   const iframe = document.getElementById('iframe-criador-ficha');
   if (!modal || !iframe) return;
   if (!campanhaAtual) return mostrarPopup('❌ Selecione uma campanha antes de criar a ficha.');
-  if (sistemaAtual?.configuracao?.tipo === 'legado' || sistemaAtual?.configuracao?.ficha === 'ficha-editor.html') {
+  if (!sistemaAtual) return mostrarPopup('❌ Esta campanha está sem um sistema RPG vinculado.');
+  if (ehFichaLegadaAtual()) {
     iframe.src = 'ficha-editor.html?modo=criacao&t=' + Date.now();
   } else {
-    iframe.src = 'ficha-generica.html?modo=criacao&sistema=' + encodeURIComponent(sistemaAtual?.id || '') + '&t=' + Date.now();
+    iframe.src = 'ficha-generica.html?modo=criacao&sistema=' + encodeURIComponent(sistemaAtual.id) + '&t=' + Date.now();
   }
   const titulo = document.querySelector('#modal-criador-ficha .modal-ficha-cabecalho h2');
   if (titulo) titulo.textContent = `⚔️ Criar Nova Ficha — ${sistemaAtual?.nome || 'Sistema RPG'}`;
@@ -1068,7 +1195,7 @@ function abrirEditorFichaAtual() {
   const modal = document.getElementById('modal-criador-ficha');
   const iframe = document.getElementById('iframe-criador-ficha');
   if (!modal || !iframe) return;
-  iframe.src = (sistemaAtual?.configuracao?.tipo === 'legado' || sistemaAtual?.configuracao?.ficha === 'ficha-editor.html') ? ('ficha-editor.html?modo=edicao&t=' + Date.now()) : ('ficha-generica.html?modo=edicao&sistema=' + encodeURIComponent(sistemaAtual?.id || '') + '&t=' + Date.now());
+  iframe.src = ehFichaLegadaAtual() ? ('ficha-editor.html?modo=edicao&t=' + Date.now()) : ('ficha-generica.html?modo=edicao&sistema=' + encodeURIComponent(sistemaAtual.id) + '&t=' + Date.now());
   modal.style.display = 'flex';
   iframe.addEventListener('load', function carregarEdicaoUmaVez() {
     iframe.removeEventListener('load', carregarEdicaoUmaVez);
@@ -1083,7 +1210,7 @@ function abrirEditorFicha(dados, userId = null) {
   if (!modal || !iframe) return;
 
   fichaEditandoUserId = userId;
-  iframe.src = (sistemaAtual?.configuracao?.tipo === 'legado' || sistemaAtual?.configuracao?.ficha === 'ficha-editor.html') ? ('ficha-editor.html?modo=edicao&t=' + Date.now()) : ('ficha-generica.html?modo=edicao&sistema=' + encodeURIComponent(sistemaAtual?.id || '') + '&t=' + Date.now());
+  iframe.src = ehFichaLegadaAtual() ? ('ficha-editor.html?modo=edicao&t=' + Date.now()) : ('ficha-generica.html?modo=edicao&sistema=' + encodeURIComponent(sistemaAtual.id) + '&t=' + Date.now());
   modal.style.display = 'flex';
   iframe.addEventListener('load', function carregarEdicaoUmaVez() {
     iframe.removeEventListener('load', carregarEdicaoUmaVez);

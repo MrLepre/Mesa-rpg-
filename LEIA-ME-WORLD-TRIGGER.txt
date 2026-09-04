@@ -1,0 +1,28 @@
+WORLD TRIGGER RPG — INTEGRAÇÃO À BIBLIOTECA
+
+Base: pacote Sistemas Etapa 4.
+
+O que foi adicionado:
+- Botão do Mestre para adicionar o World Trigger RPG à biblioteca.
+- Configuração própria do sistema, baseada no Guia do Agente — RPG de Trion.
+- Módulos declarados: Trion, Triggers, Squads, Radar, Visibilidade por Squad, Bagworm, Chameleon, Operador, Rank Wars e Eventos Dinâmicos.
+- Arsenal padrão cadastrado com os Triggers e técnicas descritos no guia.
+- Ficha genérica especial para World Trigger com Centro de Trion.
+- Geração de Trion: 1d10 + 2 e conversão para valor de Trion x5.
+- Controle de Trion atual, gasto por ação e regeneração manual de +1.
+- Regras de eficiência/sobrecarga exibidas no painel.
+- Arsenal de Triggers exibido diretamente na ficha.
+- SQL opcional para instalar o sistema diretamente no Supabase.
+
+Instalação:
+1. Substitua os arquivos do site pelos arquivos deste pacote.
+2. Entre como Mestre.
+3. Abra "Sistemas RPG".
+4. Clique em "🌐 Adicionar World Trigger RPG".
+5. Ao criar uma nova campanha, escolha World Trigger RPG.
+
+Alternativa:
+- Execute sql-world-trigger-rpg.sql no Supabase depois de aplicar a arquitetura de sistemas/campanhas.
+
+Observação:
+Esta etapa cadastra e torna funcional o núcleo de Trion/ficha. Radar, visibilidade por Squad, Bagworm, Operador e Rank Wars estão declarados como módulos do sistema para a próxima implementação da mesa, sem inventar regras além do guia.

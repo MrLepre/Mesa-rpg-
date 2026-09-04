@@ -1019,11 +1019,23 @@ async function salvarSistema(){
   if(result.error)return mostrarPopup('❌ Erro ao salvar sistema: '+result.error.message);
   fecharNovoSistema(); await carregarSistemas(); mostrarPopup(`⚙️ Sistema "${nome}" salvo com sucesso!`);
 }
+function abrirFichaGenericaNoIframe(iframe, src, sistema, dados = null, modo = 'criacao') {
+  if (!iframe || !sistema) return;
+  const enviar = () => {
+    try {
+      iframe.contentWindow.postMessage({ type: 'cronicas-camelot-carregar-sistema', sistema }, window.location.origin);
+      if (dados) iframe.contentWindow.postMessage({ type: 'cronicas-camelot-carregar-ficha', dados, modo }, window.location.origin);
+    } catch (err) { console.error('Erro ao enviar sistema para a ficha:', err); }
+  };
+  iframe.addEventListener('load', enviar, { once: true });
+  iframe.src = src;
+}
+
 async function abrirFichaDoSistema(id){
   const {data,error}=await supabaseClient.from('sistemas').select('*').eq('id',id).single(); if(error||!data)return mostrarPopup('❌ Sistema não encontrado.');
   sistemaAtual=data;
   const modal=document.getElementById('modal-criador-ficha'), iframe=document.getElementById('iframe-criador-ficha'); if(!modal||!iframe)return;
-  if(data.configuracao?.tipo==='legado') iframe.src='ficha-editor.html?modo=criacao&t='+Date.now(); else iframe.src='ficha-generica.html?modo=criacao&sistema='+encodeURIComponent(id)+'&t='+Date.now();
+  if(data.configuracao?.tipo==='legado') iframe.src='ficha-editor.html?modo=criacao&t='+Date.now(); else abrirFichaGenericaNoIframe(iframe, 'ficha-generica.html?modo=criacao&sistema='+encodeURIComponent(id)+'&t='+Date.now(), data, null, 'criacao');
   const titulo=document.querySelector('#modal-criador-ficha .modal-ficha-cabecalho h2'); if(titulo)titulo.textContent=`⚔️ Ficha — ${data.nome}`;
   modal.style.display='flex';
 }
@@ -1183,7 +1195,7 @@ function abrirCriadorFicha() {
   if (ehFichaLegadaAtual()) {
     iframe.src = 'ficha-editor.html?modo=criacao&t=' + Date.now();
   } else {
-    iframe.src = 'ficha-generica.html?modo=criacao&sistema=' + encodeURIComponent(sistemaAtual.id) + '&t=' + Date.now();
+    abrirFichaGenericaNoIframe(iframe, 'ficha-generica.html?modo=criacao&sistema=' + encodeURIComponent(sistemaAtual.id) + '&t=' + Date.now(), sistemaAtual, null, 'criacao');
   }
   const titulo = document.querySelector('#modal-criador-ficha .modal-ficha-cabecalho h2');
   if (titulo) titulo.textContent = `⚔️ Criar Nova Ficha — ${sistemaAtual?.nome || 'Sistema RPG'}`;
@@ -1195,12 +1207,15 @@ function abrirEditorFichaAtual() {
   const modal = document.getElementById('modal-criador-ficha');
   const iframe = document.getElementById('iframe-criador-ficha');
   if (!modal || !iframe) return;
-  iframe.src = ehFichaLegadaAtual() ? ('ficha-editor.html?modo=edicao&t=' + Date.now()) : ('ficha-generica.html?modo=edicao&sistema=' + encodeURIComponent(sistemaAtual.id) + '&t=' + Date.now());
+  if (ehFichaLegadaAtual()) {
+    iframe.src = 'ficha-editor.html?modo=edicao&t=' + Date.now();
+    iframe.addEventListener('load', function carregarEdicaoLegadaUmaVez() {
+      iframe.contentWindow.postMessage({ type: 'cronicas-camelot-carregar-ficha', dados: dadosFichaAtual, modo: 'edicao', userId: null }, window.location.origin);
+    }, { once: true });
+  } else {
+    abrirFichaGenericaNoIframe(iframe, 'ficha-generica.html?modo=edicao&sistema=' + encodeURIComponent(sistemaAtual.id) + '&t=' + Date.now(), sistemaAtual, dadosFichaAtual, 'edicao');
+  }
   modal.style.display = 'flex';
-  iframe.addEventListener('load', function carregarEdicaoUmaVez() {
-    iframe.removeEventListener('load', carregarEdicaoUmaVez);
-    iframe.contentWindow.postMessage({ type: 'cronicas-camelot-carregar-ficha', dados: dadosFichaAtual, modo: 'edicao', userId: null }, window.location.origin);
-  });
 }
 
 function abrirEditorFicha(dados, userId = null) {
@@ -1210,17 +1225,15 @@ function abrirEditorFicha(dados, userId = null) {
   if (!modal || !iframe) return;
 
   fichaEditandoUserId = userId;
-  iframe.src = ehFichaLegadaAtual() ? ('ficha-editor.html?modo=edicao&t=' + Date.now()) : ('ficha-generica.html?modo=edicao&sistema=' + encodeURIComponent(sistemaAtual.id) + '&t=' + Date.now());
+  if (ehFichaLegadaAtual()) {
+    iframe.src = 'ficha-editor.html?modo=edicao&t=' + Date.now();
+    iframe.addEventListener('load', function carregarEdicaoUmaVez() {
+      iframe.contentWindow.postMessage({ type: 'cronicas-camelot-carregar-ficha', dados, modo: 'edicao', userId }, window.location.origin);
+    }, { once: true });
+  } else {
+    abrirFichaGenericaNoIframe(iframe, 'ficha-generica.html?modo=edicao&sistema=' + encodeURIComponent(sistemaAtual.id) + '&t=' + Date.now(), sistemaAtual, dados, 'edicao');
+  }
   modal.style.display = 'flex';
-  iframe.addEventListener('load', function carregarEdicaoUmaVez() {
-    iframe.removeEventListener('load', carregarEdicaoUmaVez);
-    iframe.contentWindow.postMessage({
-      type: 'cronicas-camelot-carregar-ficha',
-      dados: dados,
-      modo: 'edicao',
-      userId: userId
-    }, window.location.origin);
-  });
 }
 
 function fecharCriadorFicha() {

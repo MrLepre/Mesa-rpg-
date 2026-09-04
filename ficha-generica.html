@@ -15,7 +15,7 @@
 <body>
 <div class="ficha" id="ficha"><div class="top"><h1 id="titulo">Sistema RPG</h1><p id="subtitulo">Ficha de personagem</p></div><div id="conteudo"><p class="vazio">Carregando sistema...</p></div><div class="acoes"><button onclick="enviar()">⚔️ Enviar para a Mesa</button><button onclick="salvarLocal()">💾 Salvar rascunho</button><button onclick="window.print()">📜 Imprimir / PDF</button></div></div>
 <script>
-let sistema=null, config={}, modo='criacao', dadosCarregados=null;
+let sistema=null, config={}, modo='criacao', dadosCarregados=null, sistemaRecebidoDoPai=false;
 function esc(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;')}
 function slug(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9_]/g,'_').toUpperCase()}
 function catalogo(c){return [...(c.atributos||[]).map((x,i)=>({...x,id:x.id||`atributo_${i}`,grupo:'Atributo',tipo:'numero'})),...(c.recursos||[]).map((x,i)=>({...x,id:x.id||`recurso_${i}`,grupo:'Recurso',tipo:x.tipo||'numero'})),...(c.pericias||[]).map((x,i)=>({...x,id:x.id||`pericia_${i}`,grupo:'Perícia',tipo:'numero'})),...(c.campos||[]).map((x,i)=>({...x,id:x.id||`campo_${i}`,grupo:'Campo',tipo:x.tipo||'texto'}))]}
@@ -72,8 +72,44 @@ function resolverRolagem(expr){const vals=montarMapaValores();return String(expr
 function rolarCampo(id){const c=catalogo(config).find(x=>x.id===id);if(!c?.rolagem)return;const expr=resolverRolagem(c.rolagem);window.parent.postMessage({type:'cronicas-camelot-rolar-expressao',expressao:expr,descricao:`${sistema.nome}: ${c.nome}`},location.origin)}
 function enviar(){window.parent.postMessage({type:'cronicas-camelot-ficha-pronta',dados:obter(),modo, sistema_id:sistema?.id},location.origin)}
 function salvarLocal(){localStorage.setItem('ficha_rpg_rascunho_'+(sistema?.id||'generico'),JSON.stringify(obter()));alert('💾 Rascunho salvo neste dispositivo.');}
-async function iniciar(){const p=new URLSearchParams(location.search);const id=p.get('sistema');modo=p.get('modo')||'criacao';if(!id){document.getElementById('conteudo').innerHTML='<p class="vazio">Nenhum sistema foi informado.</p>';return}const sb=window.supabase.createClient('https://rolrbrtpqbchyxmjmvzr.supabase.co','sb_publishable_mJmFjELKk4O1HCTzoKxDdw_EWaiv4j1');const r=await sb.from('sistemas').select('*').eq('id',id).single();if(r.error){document.getElementById('conteudo').innerHTML='<p class="vazio">Sistema não encontrado.</p>';return}sistema=r.data;config=sistema.configuracao||{};renderizar(config)}
-window.addEventListener('message',e=>{if(e.origin!==location.origin||e.data?.type!=='cronicas-camelot-carregar-ficha')return;dadosCarregados=e.data.dados||{};modo=e.data.modo||'edicao';if(sistema)renderizar(config)});
+async function carregarSistemaRecebido(data){
+  if(!data) return;
+  sistemaRecebidoDoPai=true;
+  sistema=data;
+  config=data.configuracao||{};
+  renderizar(config);
+}
+
+async function iniciar(){
+  const p=new URLSearchParams(location.search);
+  const id=p.get('sistema');
+  modo=p.get('modo')||'criacao';
+  if(!id){document.getElementById('conteudo').innerHTML='<p class="vazio">Nenhum sistema foi informado.</p>';return}
+
+  // A ficha recebe o sistema do documento-pai quando aberta pela mesa.
+  // Isso evita depender de uma segunda sessão/RLS do Supabase dentro do iframe.
+  const sb=window.supabase.createClient('https://rolrbrtpqbchyxmjmvzr.supabase.co','sb_publishable_mJmFjELKk4O1HCTzoKxDdw_EWaiv4j1');
+  const r=await sb.from('sistemas').select('*').eq('id',id).maybeSingle();
+  if(!sistemaRecebidoDoPai && !r.error && r.data){
+    await carregarSistemaRecebido(r.data);
+  } else if(!sistemaRecebidoDoPai) {
+    document.getElementById('conteudo').innerHTML='<p class="vazio">Carregando configuração do sistema...</p>';
+  }
+}
+
+window.addEventListener('message',e=>{
+  if(e.origin!==location.origin) return;
+  if(e.data?.type==='cronicas-camelot-carregar-sistema'){
+    carregarSistemaRecebido(e.data.sistema);
+    return;
+  }
+  if(e.data?.type==='cronicas-camelot-carregar-ficha'){
+    dadosCarregados=e.data.dados||{};
+    modo=e.data.modo||'edicao';
+    if(sistema) renderizar(config);
+  }
+});
+
 iniciar();
 </script></body></html>
 

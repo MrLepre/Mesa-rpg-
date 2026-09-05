@@ -871,6 +871,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       atualizarInterfaceAuth(session?.user || null);
 
       if (session?.user) {
+        // Garante que o sistema Elarion exista antes de carregar a lista de Sistemas.
+        // A versão anterior possuía a função de criação, mas nunca a executava.
+        if (ehMestreGlobal) await garantirSistemaElarion();
         await carregarCampanhasDoUsuario(session.user.id);
         carregarFichaDoUsuario(session.user.id);
       }
@@ -1963,7 +1966,12 @@ function mudarAba(nomeAba, evento) {
     abasCarregadas.galeria = true;
     carregarGaleria();
   }
-  if (nomeAba === 'sistemas' && supabaseClient) carregarSistemas();
+  if (nomeAba === 'sistemas' && supabaseClient) {
+    (async () => {
+      if (ehMestreGlobal) await garantirSistemaElarion();
+      await carregarSistemas();
+    })();
+  }
 }
 
 // --- FICHA DO PERSONAGEM ---

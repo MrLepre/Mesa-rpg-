@@ -1236,3 +1236,7 @@ body.imagem-mestre-aberta { overflow:hidden !important; }
 
 /* World Trigger — loadout e opções do mapa */
 .wt-triggers-mapa{margin:10px 0;padding:10px;border:1px solid #1e4f68;border-radius:6px;background:#071018}.wt-triggers-mapa>strong{display:block;color:#69d3ff;margin-bottom:7px}.wt-triggers-mapa-lista{display:flex;flex-wrap:wrap;gap:7px}.wt-trigger-btn{background:#0c2433;color:#d7f3ff;border:1px solid #2d91bd;border-radius:5px;padding:7px 9px;cursor:pointer;font:inherit}.wt-trigger-btn:hover,.wt-trigger-btn.ativo{border-color:#69d3ff;box-shadow:0 0 8px rgba(57,184,255,.14)}.wt-trigger-btn small{display:block;color:#8aaaba;font-size:.72rem}.wt-sem-triggers{padding:9px;border:1px dashed #765b2b;border-radius:5px;color:#ffca70;background:#15110a}.wt-slot-group{max-height:360px;overflow:auto}
+
+
+/* Proteção de interação dos dados no mobile. */
+.btn-dado { position: relative; z-index: 1; pointer-events: auto !important; touch-action: manipulation !important; }

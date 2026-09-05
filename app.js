@@ -743,6 +743,18 @@ document.addEventListener('click', (event) => {
   }
 });
 
+// Botões de dados usam listeners próprios e estritos.
+// Isso evita que um clique/toque que caia sobre outro elemento seja interpretado
+// como uma rolagem, especialmente em navegadores móveis.
+document.addEventListener('click', (event) => {
+  const botaoDado = event.target.closest('.btn-dado[data-lados]');
+  if (!botaoDado || botaoDado.disabled) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const lados = Number(botaoDado.dataset.lados);
+  if ([4,6,8,10,12,20,100].includes(lados)) rolarDado(lados, 'botao-dado');
+}, true);
+
 document.addEventListener('keydown', (event) => {
   const tag = document.activeElement?.tagName;
   const digit = event.key;
@@ -2673,7 +2685,13 @@ function ativarArrastoToken(token) {
 }
 
 // --- ROLAGENS DE DADOS ---
-function rolarDado(lados) {
+function rolarDado(lados, origem = 'externa') {
+  // Segurança contra toques acidentais/elementos sobrepostos no mobile:
+  // a rolagem de dado só pode ser disparada pelo listener explícito dos botões.
+  if (origem !== 'botao-dado') {
+    console.warn('Rolagem ignorada: origem não autorizada.', origem);
+    return;
+  }
   tocarSom('dice');
   vibrarPadrao([22]);
   const resultado = Math.floor(Math.random() * lados) + 1;

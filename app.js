@@ -41,7 +41,9 @@ let worldTriggerEstado = {
   scans: {},
   tokens: {},
   squadNpcs: [],
-  campoVisaoCelulas: 8
+  campoVisaoCelulas: 8,
+  mapaTatico: { paredes: {}, coberturas: {} },
+  ultimaSincronizacaoTatica: 0
 };
 
 function obterConfiguracaoSistemaAtualWT() {
@@ -72,7 +74,7 @@ function worldTriggerAtivo() {
 
 function carregarEstadoWorldTrigger() {
   if (!worldTriggerAtivo()) {
-    worldTriggerEstado = { meuSquad:'', bagworm:false, chameleon:false, triggersAtivos:[], scans:{}, tokens:{}, squadNpcs:[], campoVisaoCelulas:8 };
+    worldTriggerEstado = { meuSquad:'', bagworm:false, chameleon:false, triggersAtivos:[], scans:{}, tokens:{}, squadNpcs:[], campoVisaoCelulas:8, mapaTatico:{paredes:{},coberturas:{}} };
     return;
   }
   try {
@@ -86,10 +88,11 @@ function carregarEstadoWorldTrigger() {
       scans: salvo.scans || {},
       tokens: {},
       squadNpcs: Array.isArray(salvo.squadNpcs) ? salvo.squadNpcs.map((n,i)=>({ ...n, indice:i, bagwormAtivo:!!n.bagwormAtivo, chameleonAtivo:!!n.chameleonAtivo })) : [],
-      campoVisaoCelulas: Math.max(3, Math.min(20, Number(salvo.campoVisaoCelulas) || 8))
+      campoVisaoCelulas: Math.max(3, Math.min(20, Number(salvo.campoVisaoCelulas) || 8)),
+      mapaTatico: normalizarMapaTaticoWT(salvo.mapaTatico)
     };
   } catch (err) {
-    worldTriggerEstado = { meuSquad:'', bagworm:false, chameleon:false, triggersAtivos:[], scans:{}, tokens:{}, squadNpcs:[], campoVisaoCelulas:8 };
+    worldTriggerEstado = { meuSquad:'', bagworm:false, chameleon:false, triggersAtivos:[], scans:{}, tokens:{}, squadNpcs:[], campoVisaoCelulas:8, mapaTatico:{paredes:{},coberturas:{}} };
   }
 }
 
@@ -104,7 +107,8 @@ function salvarEstadoWorldTrigger() {
       triggersAtivos: worldTriggerEstado.triggersAtivos,
       scans: worldTriggerEstado.scans,
       squadNpcs: (worldTriggerEstado.squadNpcs || []).map(n=>({ indice:n.indice, bagwormAtivo:!!n.bagwormAtivo, chameleonAtivo:!!n.chameleonAtivo })),
-      campoVisaoCelulas: worldTriggerEstado.campoVisaoCelulas
+      campoVisaoCelulas: worldTriggerEstado.campoVisaoCelulas,
+      mapaTatico: worldTriggerEstado.mapaTatico || {paredes:{}, coberturas:{}}
     }));
   } catch (err) {}
 }
@@ -146,6 +150,217 @@ function obterMeuTokenWT() {
   return encontrado || null;
 }
 
+
+function normalizarMapaTaticoWT(mapa) {
+  const src = mapa && typeof mapa === 'object' ? mapa : {};
+  const normalizar = (obj) => {
+    const out = {};
+    if (!obj || typeof obj !== 'object') return out;
+    Object.keys(obj).forEach(k => {
+      const v = obj[k];
+      if (v) out[String(k)] = { tipo: String(v.tipo || 'parede'), atualizadoEm: Number(v.atualizadoEm || Date.now()) };
+    });
+    return out;
+  };
+  return { paredes: normalizar(src.paredes), coberturas: normalizar(src.coberturas) };
+}
+
+function obterMapaTaticoWT() {
+  if (!worldTriggerEstado.mapaTatico) worldTriggerEstado.mapaTatico = { paredes:{}, coberturas:{} };
+  return worldTriggerEstado.mapaTatico;
+}
+
+function obterDimensoesGradeWT() {
+  const scaler = document.getElementById('vtt-mapa-scaler');
+  if (!scaler) return null;
+  const largura = scaler.clientWidth || scaler.getBoundingClientRect().width;
+  const altura = scaler.clientHeight || scaler.getBoundingClientRect().height;
+  if (!largura || !altura) return null;
+  return { largura, altura, cols: Math.max(1, Math.ceil(largura / vttGridTamanho)), rows: Math.max(1, Math.ceil(altura / vttGridTamanho)) };
+}
+
+function obterCelulaMapaWT(xPct, yPct) {
+  const d = obterDimensoesGradeWT();
+  if (!d) return null;
+  const x = Math.max(0, Math.min(99.999, Number(xPct) || 0)) / 100 * d.largura;
+  const y = Math.max(0, Math.min(99.999, Number(yPct) || 0)) / 100 * d.altura;
+  return { cx: Math.floor(x / vttGridTamanho), cy: Math.floor(y / vttGridTamanho) };
+}
+
+function chaveCelulaWT(cx, cy) { return `${Math.max(0, Math.floor(cx))}:${Math.max(0, Math.floor(cy))}`; }
+
+function obterCelulaDeTokenWT(token) {
+  const p = obterCoordenadasTokenWT(token);
+  return p ? obterCelulaMapaWT(p.x, p.y) : null;
+}
+
+function existeParedeWT(cx, cy) {
+  const k = chaveCelulaWT(cx, cy);
+  return !!obterMapaTaticoWT().paredes[k];
+}
+
+function existeCoberturaWT(cx, cy) {
+  const k = chaveCelulaWT(cx, cy);
+  return !!obterMapaTaticoWT().coberturas[k];
+}
+
+function linhaVisadaBloqueadaWT(a, b) {
+  if (!a || !b) return true;
+  let x0 = Math.floor(a.cx), y0 = Math.floor(a.cy);
+  const x1 = Math.floor(b.cx), y1 = Math.floor(b.cy);
+  const dx = Math.abs(x1-x0), sx = x0 < x1 ? 1 : -1;
+  const dy = -Math.abs(y1-y0), sy = y0 < y1 ? 1 : -1;
+  let err = dx + dy;
+  while (true) {
+    if (!(x0 === a.cx && y0 === a.cy) && !(x0 === b.cx && y0 === b.cy) && existeParedeWT(x0, y0)) return true;
+    if (x0 === x1 && y0 === y1) break;
+    const e2 = 2 * err;
+    if (e2 >= dy) { err += dy; x0 += sx; }
+    if (e2 <= dx) { err += dx; y0 += sy; }
+  }
+  return false;
+}
+
+function alvoTemCoberturaWT(alvo) {
+  const c = obterCelulaDeTokenWT(alvo);
+  return !!c && existeCoberturaWT(c.cx, c.cy);
+}
+
+function calcularDistanciaCelulasWT(a, b) {
+  if (!a || !b) return Infinity;
+  return Math.hypot(b.cx-a.cx, b.cy-a.cy);
+}
+
+function tokenEstaNoCampoDeVisaoComLoSWT(alvo) {
+  if (!alvo || !worldTriggerAtivo()) return false;
+  const alvoPos = obterCoordenadasTokenWT(alvo);
+  const alvoCel = alvoPos ? obterCelulaMapaWT(alvoPos.x, alvoPos.y) : null;
+  if (!alvoCel) return false;
+  const aliados = obterTokensDoMeuSquadWT().slice();
+  const meu = obterMeuTokenWT();
+  if (!aliados.length && meu) aliados.push(meu);
+  const raio = Math.max(3, Math.min(20, Number(worldTriggerEstado.campoVisaoCelulas)||8));
+  return aliados.some(aliado => {
+    const p = obterCoordenadasTokenWT(aliado);
+    const c = p ? obterCelulaMapaWT(p.x, p.y) : null;
+    if (!c || calcularDistanciaCelulasWT(c, alvoCel) > raio) return false;
+    return !linhaVisadaBloqueadaWT(c, alvoCel);
+  });
+}
+
+function obterNivelInformacaoWT(token) {
+  if (!token) return 'desconhecido';
+  if (ehTokenDoMeuSquad(token)) return 'aliado';
+  const scan = worldTriggerEstado.scans?.[token.id];
+  if (scan?.analisado) return 'analisado';
+  if (tokenEstaNoCampoDeVisaoComLoSWT(token)) return 'identificado';
+  if (scan) return 'aproximado';
+  if (!tokenEstaOcultoNoRadar(token)) return 'detectado';
+  return 'desconhecido';
+}
+
+function serializarMapaTaticoWT() {
+  return JSON.parse(JSON.stringify(obterMapaTaticoWT()));
+}
+
+function transmitirMapaTaticoWT() {
+  if (!canalMesa || !obterCampanhaIdAtual()) return;
+  canalMesa.send({ type:'broadcast', event:'wt_mapa_tatico', payload:{ campanha_id:obterCampanhaIdAtual(), mapaTatico:serializarMapaTaticoWT(), enviadoEm:Date.now() } });
+  persistirMapaTaticoSupabaseWT();
+}
+
+async function persistirMapaTaticoSupabaseWT() {
+  if (!supabaseClient || !ehMestreGlobal || !obterCampanhaIdAtual()) return;
+  try {
+    await supabaseClient.from('mapas').update({ dados_taticos: serializarMapaTaticoWT() }).eq('campanha_id', obterCampanhaIdAtual());
+  } catch (err) { console.warn('Mapa tático: coluna dados_taticos ainda não disponível ou atualização falhou.', err); }
+}
+
+async function carregarMapaTaticoSupabaseWT() {
+  if (!supabaseClient || !obterCampanhaIdAtual()) return;
+  try {
+    const {data,error}=await supabaseClient.from('mapas').select('dados_taticos').eq('campanha_id',obterCampanhaIdAtual()).limit(1).maybeSingle();
+    if (!error && data?.dados_taticos) {
+      worldTriggerEstado.mapaTatico=normalizarMapaTaticoWT(data.dados_taticos);
+      salvarEstadoWorldTrigger();
+      renderizarObstaculosMapaWT();
+      agendarRecalculoVisibilidadeWT();
+    }
+  } catch(err){ console.warn('Não foi possível carregar a geometria tática persistida.',err); }
+}
+
+function alternarEdicaoMapaTaticoWT() {
+  if (!ehMestreGlobal) return;
+  const el=document.getElementById('wt-edicao-tatica');
+  if (el) el.classList.toggle('ativo');
+  const canvas=document.getElementById('vtt-canvas');
+  if(canvas) canvas.dataset.taticaEditando=el?.classList.contains('ativo')?'true':'false';
+  mostrarPopup(el?.classList.contains('ativo') ? '🧱 Edição tática ativada: clique nas células do mapa.' : '🧱 Edição tática desativada.');
+}
+
+function definirFerramentaMapaTaticoWT(tipo) {
+  const host=document.getElementById('wt-edicao-tatica');
+  if(!host) return;
+  host.dataset.ferramenta=tipo;
+  host.querySelectorAll('[data-ferramenta]').forEach(b=>b.classList.toggle('ativo',b.dataset.ferramenta===tipo));
+}
+
+function editarCelulaMapaTaticoWT(event) {
+  if (!ehMestreGlobal) return;
+  const host=document.getElementById('wt-edicao-tatica');
+  if (!host?.classList.contains('ativo')) return;
+  const alvo=event.target.closest('#vtt-mapa-scaler');
+  if (!alvo || event.target.closest('.vtt-token')) return;
+  const rect=alvo.getBoundingClientRect();
+  if(!rect.width || !rect.height) return;
+  const x=((event.clientX-rect.left)/rect.width)*100;
+  const y=((event.clientY-rect.top)/rect.height)*100;
+  const c=obterCelulaMapaWT(x,y); if(!c) return;
+  const k=chaveCelulaWT(c.cx,c.cy);
+  const mapa=obterMapaTaticoWT();
+  const ferramenta=host.dataset.ferramenta||'parede';
+  if(ferramenta==='apagar'){ delete mapa.paredes[k]; delete mapa.coberturas[k]; }
+  else if(ferramenta==='parede'){ mapa.paredes[k]={tipo:'parede',atualizadoEm:Date.now()}; delete mapa.coberturas[k]; }
+  else if(ferramenta==='cobertura'){ mapa.coberturas[k]={tipo:'cobertura',atualizadoEm:Date.now()}; delete mapa.paredes[k]; }
+  salvarEstadoWorldTrigger(); renderizarObstaculosMapaWT(); agendarRecalculoVisibilidadeWT(); transmitirMapaTaticoWT();
+  event.preventDefault();
+}
+
+function limparMapaTaticoWT() {
+  if(!ehMestreGlobal) return;
+  worldTriggerEstado.mapaTatico={paredes:{},coberturas:{}};
+  salvarEstadoWorldTrigger(); renderizarObstaculosMapaWT(); agendarRecalculoVisibilidadeWT(); transmitirMapaTaticoWT();
+  mostrarPopup('🧹 Geometria tática limpa.');
+}
+
+function renderizarObstaculosMapaWT() {
+  const camada=document.getElementById('vtt-obstaculos-camada');
+  const d=obterDimensoesGradeWT();
+  if(!camada || !d || !worldTriggerAtivo()) return;
+  const mapa=obterMapaTaticoWT();
+  const cells=[];
+  const add=(obj,tipo)=>Object.keys(obj||{}).forEach(k=>{
+    const [cx,cy]=k.split(':').map(Number); if(!Number.isFinite(cx)||!Number.isFinite(cy)) return;
+    const left=(cx*vttGridTamanho/d.largura)*100, top=(cy*vttGridTamanho/d.altura)*100;
+    const w=(vttGridTamanho/d.largura)*100, h=(vttGridTamanho/d.altura)*100;
+    cells.push(`<div class="wt-obstaculo ${tipo}" style="left:${left}%;top:${top}%;width:${w}%;height:${h}%;"></div>`);
+  });
+  add(mapa.paredes,'parede'); add(mapa.coberturas,'cobertura');
+  camada.innerHTML=cells.join('');
+}
+
+function renderizarControlesMapaTaticoWT() {
+  if(!ehMestreGlobal) return '';
+  return `<div id="wt-edicao-tatica" data-ferramenta="parede" class="wt-edicao-tatica">
+    <strong>🧱 Geometria tática</strong>
+    <button type="button" data-ferramenta="parede" class="ativo" onclick="definirFerramentaMapaTaticoWT('parede')">🧱 Parede</button>
+    <button type="button" data-ferramenta="cobertura" onclick="definirFerramentaMapaTaticoWT('cobertura')">🛡️ Cobertura</button>
+    <button type="button" data-ferramenta="apagar" onclick="definirFerramentaMapaTaticoWT('apagar')">🧽 Apagar</button>
+    <button type="button" onclick="limparMapaTaticoWT()">🗑️ Limpar</button>
+    <button type="button" onclick="alternarEdicaoMapaTaticoWT()">✏️ Editar</button>
+  </div>`;
+}
+
 function obterRaioCampoVisaoWT() {
   const scaler = document.getElementById('vtt-mapa-scaler');
   const largura = scaler?.clientWidth || scaler?.offsetWidth || 1000;
@@ -167,13 +382,7 @@ function tokenEstaNoCampoDeVisaoWT(alvo) {
   if (!aliados.length && meuToken) aliados.push(meuToken);
   const raio = obterRaioCampoVisaoWT();
 
-  return aliados.some(aliado => {
-    const pos = obterCoordenadasTokenWT(aliado);
-    if (!pos) return false;
-    const dx = alvoPos.x - pos.x;
-    const dy = alvoPos.y - pos.y;
-    return Math.sqrt(dx * dx + dy * dy) <= raio;
-  });
+  return tokenEstaNoCampoDeVisaoComLoSWT(alvo);
 }
 
 function tokenFoiEscaneadoWT(token) {
@@ -186,12 +395,12 @@ function tokenEstaOcultoNoRadar(token) {
   if (ehMestreGlobal) return false;
   // Bagworm remove do radar. Chameleon só pode ser encontrado pelo Scan.
   if (token?.dataset) {
-    if (token.dataset.tokenChameleon === 'true') return !tokenFoiEscaneadoWT(token);
-    if (token.dataset.tokenBagworm === 'true') return !tokenEstaNoCampoDeVisaoWT(token) && !tokenFoiEscaneadoWT(token);
+    if (token.dataset.tokenChameleon === 'true') return false;
+    if (token.dataset.tokenBagworm === 'true') return true;
     return false;
   }
-  if (token?.chameleon) return !tokenFoiEscaneadoWT(token);
-  if (token?.bagworm) return !tokenEstaNoCampoDeVisaoWT(token) && !tokenFoiEscaneadoWT(token);
+  if (token?.chameleon) return false;
+  if (token?.bagworm) return true;
   return false;
 }
 
@@ -213,7 +422,7 @@ function tokenVisivelParaMim(token) {
   }
 
   // O campo de visão passa a ser a regra normal para inimigos.
-  return tokenEstaNoCampoDeVisaoWT(token);
+  return tokenEstaNoCampoDeVisaoComLoSWT(token);
 }
 
 function atualizarVisibilidadeTodosTokensWT() {
@@ -240,7 +449,7 @@ function atualizarRadarWorldTrigger() {
   const visiveis = elementos.filter(t => {
     if (!t) return false;
     if (ehMestreGlobal) return true;
-    return !tokenEstaOcultoNoRadar(t) && tokenVisivelParaMim(t);
+    return !tokenEstaOcultoNoRadar(t);
   });
   if (contador) contador.textContent = `${visiveis.length} detectado${visiveis.length === 1 ? '' : 's'}`;
   if (!visiveis.length) {
@@ -253,10 +462,11 @@ function atualizarRadarWorldTrigger() {
     const escSquad = escaparHTML(t.squad || 'Sem Squad');
     const tipo = aliado ? '🟦 Aliado' : '🔴 Sinal inimigo';
     const scan = worldTriggerEstado.scans[t.id];
-    const fov = !aliado && tokenEstaNoCampoDeVisaoWT(t);
-    const modo = scan ? '📡 Scan' : (fov ? '👁️ Campo de visão' : 'Radar');
-    const detalhe = scan ? `Trion ${scan.trion ?? '?'} · ${scan.padrao || 'posição aproximada'}` : modo;
-    return `<div class="wt-radar-item"><strong>${tipo}</strong><span>${escNome} · ${escSquad}</span><small>${escaparHTML(detalhe)}</small></div>`;
+    const info = obterNivelInformacaoWT(t);
+    const fov = !aliado && tokenEstaNoCampoDeVisaoComLoSWT(t);
+    const modo = aliado ? '👥 Aliado' : (info==='analisado' ? '🧠 Analysis' : info==='identificado' ? '👁️ Visão exata' : info==='aproximado' ? '📡 Posição aproximada' : info==='detectado' ? '📡 Detectado' : '❓ Desconhecido');
+    const detalhe = scan ? `Trion ${scan.trion ?? '?'} · ${scan.padrao || 'posição aproximada'}` : (fov ? 'Posição exata' : 'Posição aproximada · radar');
+    return `<div class="wt-radar-item"><strong>${tipo}</strong><span>${escNome} · ${escSquad}</span><small>${escaparHTML(detalhe)}${fov && alvoTemCoberturaWT(t) ? ' · 🛡️ cobertura' : ''}</small></div>`;
   }).join('');
 }
 
@@ -277,6 +487,7 @@ function renderizarFovWorldTrigger() {
     if (p) pontos.push(p);
   }
   camada.innerHTML = pontos.map(p => `<div class="wt-fov-circulo" style="left:${p.x}%;top:${p.y}%;width:${raio*2}%;height:${raio*2}%;"></div>`).join('');
+  renderizarObstaculosMapaWT();
 }
 
 function normalizarSquadNPCsFichaWT(dados){
@@ -463,7 +674,7 @@ function renderizarPainelWorldTrigger() {
         <button type="button" onclick="salvarSquadWorldTrigger()">💾 Squad</button>
         <button type="button" onclick="scanWorldTrigger()">📡 Scan</button>
         <button type="button" onclick="analysisWorldTrigger()">🔎 Analysis</button>
-        <label class="wt-fov-controle">👁️ FOV <input id="wt-fov-range" type="range" min="3" max="20" step="1" value="${worldTriggerEstado.campoVisaoCelulas || 8}" oninput="alterarCampoVisaoWorldTrigger(this.value)"> <span id="wt-fov-label">${worldTriggerEstado.campoVisaoCelulas || 8}c</span></label>
+        ${renderizarControlesMapaTaticoWT()}<label class="wt-fov-controle">👁️ FOV <input id="wt-fov-range" type="range" min="3" max="20" step="1" value="${worldTriggerEstado.campoVisaoCelulas || 8}" oninput="alterarCampoVisaoWorldTrigger(this.value)"> <span id="wt-fov-label">${worldTriggerEstado.campoVisaoCelulas || 8}c</span></label>
       </div>
       ${renderizarTriggersAtivosNoMapa()}
       ${renderizarSquadNPCsNoMapaWT()}
@@ -561,7 +772,7 @@ function analysisWorldTrigger() {
   if (!candidatos.length) return mostrarPopup('🔎 Analysis: nenhum alvo disponível.');
   const alvo = candidatos.find(t => worldTriggerEstado.scans[t.id]) || candidatos[0];
   const trion = alvo.trion ?? '?';
-  worldTriggerEstado.scans[alvo.id] = { trion, padrao: 'combate identificado', momento: Date.now() };
+  worldTriggerEstado.scans[alvo.id] = { ...(worldTriggerEstado.scans[alvo.id] || {}), trion, padrao: 'combate identificado', analisado: true, momento: Date.now() };
   salvarEstadoWorldTrigger();
   atualizarVisibilidadeTodosTokensWT();
   mostrarPopup(`🔎 Analysis: ${alvo.nome || 'alvo'} · Trion ${trion} · padrão de combate identificado.`);
@@ -681,6 +892,16 @@ document.addEventListener('DOMContentLoaded', async () => {
           if (payload.payload.campanha_id && payload.payload.campanha_id !== obterCampanhaIdAtual()) return;
           exibirMapaNaTela(payload.payload.url);
           mostrarPopup('🗺️ O Mestre atualizou o Mapa de Batalha!');
+        })
+        .on('broadcast', { event: 'wt_mapa_tatico' }, (payload) => {
+          const dados = payload.payload || {};
+          if (dados.campanha_id && dados.campanha_id !== obterCampanhaIdAtual()) return;
+          if (!dados.mapaTatico) return;
+          worldTriggerEstado.mapaTatico = normalizarMapaTaticoWT(dados.mapaTatico);
+          worldTriggerEstado.ultimaSincronizacaoTatica = Date.now();
+          salvarEstadoWorldTrigger();
+          renderizarObstaculosMapaWT();
+          agendarRecalculoVisibilidadeWT();
         })
         .on('broadcast', { event: 'vtt_zoom' }, (payload) => {
           if (payload.payload.campanha_id && payload.payload.campanha_id !== obterCampanhaIdAtual()) return;
@@ -2123,8 +2344,9 @@ function exibirMapaNaTela(url) {
     
     <div id="vtt-canvas" class="vtt-wrapper" style="overflow: hidden; position: relative; width: 100%; height: ${alturaMapa}; border: 1px solid #29292e; border-radius: 6px; background: #0b0d12; display: flex; justify-content: center; align-items: center; touch-action: none; cursor: ${ehMestreGlobal && vttMovimentoLivre ? 'grab' : 'crosshair'}; transition: height 0.3s ease;">
       <div id="vtt-mapa-scaler" style="position: relative; width: 100%; transform: translate(${vttPanX}px, ${vttPanY}px) scale(${vttZoom / 100}); transform-origin: center center; transition: transform 0.05s ease-out; display: flex; justify-content: center; align-items: center;">
-        <img src="${escaparHTML(url)}" class="vtt-mapa-img" alt="Mapa Tático" decoding="async" fetchpriority="high" style="width: 100%; display: block; height: auto; pointer-events: none;">
+        <img src="${escaparHTML(url)}" class="vtt-mapa-img" alt="Mapa Tático" decoding="async" fetchpriority="high" onload="renderizarObstaculosMapaWT(); renderizarFovWorldTrigger();" style="width: 100%; display: block; height: auto; pointer-events: none;">
         <div id="vtt-fov-camada" class="wt-fov-camada" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:hidden;z-index:2;"></div>
+        <div id="vtt-obstaculos-camada" class="wt-obstaculos-camada" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:hidden;z-index:3;"></div>
         <div id="vtt-grid-camada" class="vtt-grid ${gridAtivo ? 'ativo' : ''}" style="background-size: ${vttGridTamanho}px ${vttGridTamanho}px; position: absolute; top:0; left:0; width:100%; height:100%; pointer-events: none;"></div>
         <div id="vtt-tokens-camada" style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events: none;"></div>
       </div>
@@ -2133,6 +2355,9 @@ function exibirMapaNaTela(url) {
 
   configurarPanMapa();
   if (worldTriggerAtivo()) {
+    const scalerTatico=document.getElementById('vtt-mapa-scaler');
+    if(scalerTatico && !scalerTatico.dataset.taticaListener){ scalerTatico.dataset.taticaListener='true'; scalerTatico.addEventListener('click', editarCelulaMapaTaticoWT, true); }
+    setTimeout(carregarMapaTaticoSupabaseWT, 50);
     renderizarPainelWTSeNecessario();
     atualizarEstadoTokenProprioWT();
     renderizarFovWorldTrigger();
@@ -3202,5 +3427,8 @@ window.mostrarImagemParaTodos = mostrarImagemParaTodos;
 window.abrirImagemMestre = abrirImagemMestre;
 window.fecharImagemMestre = fecharImagemMestre;
 window.alternarMovimentoMapa = alternarMovimentoMapa;
+window.alternarEdicaoMapaTaticoWT = alternarEdicaoMapaTaticoWT;
+window.definirFerramentaMapaTaticoWT = definirFerramentaMapaTaticoWT;
+window.limparMapaTaticoWT = limparMapaTaticoWT;
 window.alternarModoImersivoMapa = alternarModoImersivoMapa;
 window.tocarSom = tocarSom;

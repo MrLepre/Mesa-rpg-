@@ -670,6 +670,11 @@ body::before,
 /* ==========================================================
    CENTRAL DE AÇÕES RÁPIDAS — QoL
    ========================================================== */
+/* A Central de Ações Rápidas pertence à mesa, não à Central de Campanhas.
+   Mantê-la fora da tela evita que o botão flutuante cubra 'Entrar nesta campanha'
+   em telas pequenas. */
+.acoes-rapidas { display: none; }
+
 .acoes-rapidas {
   position: fixed;
   right: 24px;

@@ -639,6 +639,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   document.body.style.overflowX = 'hidden';
   document.body.style.touchAction = 'pan-y';
+  atualizarVisibilidadeAcoesRapidas();
 
   if (!supabaseClient && window.supabase) {
     supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -840,6 +841,7 @@ async function fazerLogout() {
   dadosFichaAtual = null;
   campanhaAtual = null;
   sistemaAtual = null;
+  atualizarVisibilidadeAcoesRapidas();
   campanhasDisponiveis = [];
   atualizarContextoCampanha();
   renderizarListaCampanhas();
@@ -1029,6 +1031,13 @@ document.addEventListener('pointerdown', (event) => {
 // ==========================================
 // ARQUITETURA MULTICAMPANHA — ETAPA 1
 // ==========================================
+function atualizarVisibilidadeAcoesRapidas() {
+  const container = document.getElementById('acoes-rapidas');
+  if (!container) return;
+  container.style.display = campanhaAtual ? 'flex' : 'none';
+  if (!campanhaAtual) fecharAcoesRapidas();
+}
+
 function atualizarContextoCampanha() {
   const contexto = document.getElementById('contexto-campanha');
   const nome = document.getElementById('campanha-ativa-nome');
@@ -1099,6 +1108,7 @@ async function carregarCampanhasDoUsuario(userId) {
   campanhaAtual = null;
   sistemaAtual = null;
   atualizarContextoCampanha();
+  atualizarVisibilidadeAcoesRapidas();
   renderizarListaCampanhas();
 
   const btn = document.getElementById('btn-nova-campanha');
@@ -1186,6 +1196,7 @@ async function selecionarCampanha(campanhaId, mostrarFeedback = true) {
   }
 
   campanhaAtual = campanha;
+  atualizarVisibilidadeAcoesRapidas();
 
   // O relacionamento campanhas -> sistemas pode estar nulo/órfão em bancos
   // que foram migrados antes da criação do sistema legado de Camelot.
@@ -3134,6 +3145,7 @@ function mostrarPopup(texto) {
 // ==========================================
 window.alternarAcoesRapidas = alternarAcoesRapidas;
 window.acaoRapida = acaoRapida;
+window.atualizarVisibilidadeAcoesRapidas = atualizarVisibilidadeAcoesRapidas;
 window.fazerLogin = fazerLogin;
 window.fazerCadastro = fazerCadastro;
 window.fazerLogout = fazerLogout;

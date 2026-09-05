@@ -40,6 +40,7 @@ let worldTriggerEstado = {
   triggersAtivos: [],
   scans: {},
   tokens: {},
+  squadNpcs: [],
   campoVisaoCelulas: 8
 };
 
@@ -71,7 +72,7 @@ function worldTriggerAtivo() {
 
 function carregarEstadoWorldTrigger() {
   if (!worldTriggerAtivo()) {
-    worldTriggerEstado = { meuSquad:'', bagworm:false, chameleon:false, triggersAtivos:[], scans:{}, tokens:{}, campoVisaoCelulas:8 };
+    worldTriggerEstado = { meuSquad:'', bagworm:false, chameleon:false, triggersAtivos:[], scans:{}, tokens:{}, squadNpcs:[], campoVisaoCelulas:8 };
     return;
   }
   try {
@@ -84,10 +85,11 @@ function carregarEstadoWorldTrigger() {
       triggersAtivos: Array.isArray(salvo.triggersAtivos) ? salvo.triggersAtivos.map(String) : [],
       scans: salvo.scans || {},
       tokens: {},
+      squadNpcs: Array.isArray(salvo.squadNpcs) ? salvo.squadNpcs.map((n,i)=>({ ...n, indice:i, bagwormAtivo:!!n.bagwormAtivo, chameleonAtivo:!!n.chameleonAtivo })) : [],
       campoVisaoCelulas: Math.max(3, Math.min(20, Number(salvo.campoVisaoCelulas) || 8))
     };
   } catch (err) {
-    worldTriggerEstado = { meuSquad:'', bagworm:false, chameleon:false, triggersAtivos:[], scans:{}, tokens:{}, campoVisaoCelulas:8 };
+    worldTriggerEstado = { meuSquad:'', bagworm:false, chameleon:false, triggersAtivos:[], scans:{}, tokens:{}, squadNpcs:[], campoVisaoCelulas:8 };
   }
 }
 
@@ -101,6 +103,7 @@ function salvarEstadoWorldTrigger() {
       chameleon: worldTriggerEstado.chameleon,
       triggersAtivos: worldTriggerEstado.triggersAtivos,
       scans: worldTriggerEstado.scans,
+      squadNpcs: (worldTriggerEstado.squadNpcs || []).map(n=>({ indice:n.indice, bagwormAtivo:!!n.bagwormAtivo, chameleonAtivo:!!n.chameleonAtivo })),
       campoVisaoCelulas: worldTriggerEstado.campoVisaoCelulas
     }));
   } catch (err) {}
@@ -276,6 +279,46 @@ function renderizarFovWorldTrigger() {
   camada.innerHTML = pontos.map(p => `<div class="wt-fov-circulo" style="left:${p.x}%;top:${p.y}%;width:${raio*2}%;height:${raio*2}%;"></div>`).join('');
 }
 
+function normalizarSquadNPCsFichaWT(dados){
+  const lista = Array.isArray(dados?.wt_squad_npcs) ? dados.wt_squad_npcs : [];
+  return [0,1,2].map(i=>{
+    const n = lista[i] || {};
+    const lados = n.trigger_lados || n.wt_trigger_lados || {};
+    const ativos = Array.isArray(n.triggers_ativos) ? n.triggers_ativos.map(String).filter(Boolean) : [];
+    const principal = Array.isArray(lados.principal) ? lados.principal.map(String).filter(Boolean) : [];
+    const secundario = Array.isArray(lados.secundario) ? lados.secundario.map(String).filter(Boolean) : [];
+    const unicos = [...new Set([...ativos,...principal,...secundario])];
+    return {
+      indice:i,
+      nome:String(n.nome||`NPC ${i+1}`),
+      funcao:String(n.funcao||''),
+      trion:Number(n.trion)||0,
+      hpMax:Number(n.hp_max)||50,
+      imagem:String(n.imagem||n.imagem_url||''),
+      triggers_ativos:unicos,
+      trigger_lados:{principal,secundario},
+      bagwormAtivo:!!n.bagworm_ativo,
+      chameleonAtivo:!!n.chameleon_ativo
+    };
+  });
+}
+function sincronizarSquadNPCsEstadoWT(dados){
+  if(!worldTriggerAtivo()) return [];
+  const defs=normalizarSquadNPCsFichaWT(dados);
+  const runtime=Array.isArray(worldTriggerEstado.squadNpcs)?worldTriggerEstado.squadNpcs:[];
+  worldTriggerEstado.squadNpcs=defs.map((n,i)=>({
+    ...n,
+    bagwormAtivo: runtime[i]?.bagwormAtivo ?? n.bagwormAtivo,
+    chameleonAtivo: runtime[i]?.chameleonAtivo ?? n.chameleonAtivo
+  }));
+  salvarEstadoWorldTrigger();
+  return worldTriggerEstado.squadNpcs;
+}
+function obterSquadNPCsWorldTrigger(){
+  if((worldTriggerEstado.squadNpcs||[]).length===3) return worldTriggerEstado.squadNpcs;
+  if(Array.isArray(dadosFichaAtual?.wt_squad_npcs) && dadosFichaAtual.wt_squad_npcs.length===3) return sincronizarSquadNPCsEstadoWT(dadosFichaAtual);
+  return [];
+}
 function normalizarTriggersFichaWT(dados){
   if(!dados) return [];
   if(Array.isArray(dados.wt_triggers_ativos)) return dados.wt_triggers_ativos.map(String).filter(Boolean);
@@ -288,6 +331,7 @@ async function carregarTriggersDaFichaWorldTrigger(){
   const atuais=normalizarTriggersFichaWT(dadosFichaAtual);
   if(atuais.length){
     worldTriggerEstado.triggersAtivos=atuais;
+    sincronizarSquadNPCsEstadoWT(dadosFichaAtual);
     salvarEstadoWorldTrigger();
     return atuais;
   }
@@ -300,6 +344,7 @@ async function carregarTriggersDaFichaWorldTrigger(){
     const triggers=normalizarTriggersFichaWT(ficha.dados_ficha);
     if(triggers.length) dadosFichaAtual=ficha.dados_ficha;
     worldTriggerEstado.triggersAtivos=triggers;
+    sincronizarSquadNPCsEstadoWT(ficha.dados_ficha);
     salvarEstadoWorldTrigger();
     return triggers;
   }catch(err){ console.warn('Não foi possível carregar os Triggers da ficha:',err); return []; }
@@ -348,6 +393,63 @@ function usarTriggerWorldTrigger(nome){
   mostrarPopup(`⚔️ ${nome} está equipado. Custo: ${custo}. A mecânica específica desse Trigger será aplicada pelo módulo de combate.`);
 }
 
+function renderizarSquadNPCsNoMapaWT(){
+  const npcs=obterSquadNPCsWorldTrigger();
+  if(!npcs.length) return '';
+  return `<div class="wt-squad-roster"><div class="wt-squad-roster-head"><strong>👥 Seu Squad — 3 NPCs</strong><small>Você controla os três agentes junto com o seu personagem.</small></div><div class="wt-squad-roster-grid">${npcs.map((n,i)=>{
+    const bag=n.triggers_ativos.some(x=>x.toLowerCase()==='bagworm');
+    const cham=n.triggers_ativos.some(x=>x.toLowerCase()==='chameleon');
+    return `<div class="wt-npc-card"><div><strong>${escaparHTML(n.nome||`NPC ${i+1}`)}</strong><small>${escaparHTML(n.funcao||'Função não definida')} · Trion ${escaparHTML(n.trion||'?')}</small></div><div class="wt-npc-actions">${bag?`<button type="button" class="${n.bagwormAtivo?'ativo':''}" onclick="alternarBagwormNPCWorldTrigger(${i})">👻 ${n.bagwormAtivo?'ON':'OFF'}</button>`:''}${cham?`<button type="button" class="${n.chameleonAtivo?'ativo':''}" onclick="alternarChameleonNPCWorldTrigger(${i})">🫥 ${n.chameleonAtivo?'ON':'OFF'}</button>`:''}<button type="button" onclick="usarTriggerNPCWorldTrigger(${i})">⚔️ Triggers</button></div></div>`;
+  }).join('')}</div></div>`;
+}
+function atualizarTokenNPCWorldTrigger(indice){
+  const n=obterSquadNPCsWorldTrigger()[indice];
+  if(!n) return;
+  const nick=obterMeuNickWT(); const base=normalizarIdTokenWT(nick); const id=`token_${base}_npc_${indice+1}`;
+  const token=document.getElementById(id);
+  if(!token) return;
+  token.dataset.tokenBagworm=String(!!n.bagwormAtivo);
+  token.dataset.tokenChameleon=String(!!n.chameleonAtivo);
+  token.dataset.tokenTriggers=JSON.stringify(n.triggers_ativos||[]);
+  token.dataset.tokenTrion=String(n.trion||'');
+  registrarTokenNoRadarWT(id,n.nome,parseFloat(token.style.left)||0,parseFloat(token.style.top)||0,worldTriggerEstado.meuSquad,!!n.bagwormAtivo,!!n.chameleonAtivo,n.trion||null,n.triggers_ativos||[]);
+  aplicarVisibilidadeTokenWT(token);
+  transmitirMovimentoToken(token,parseFloat(token.style.left)||0,parseFloat(token.style.top)||0);
+}
+function alternarBagwormNPCWorldTrigger(indice){
+  const n=obterSquadNPCsWorldTrigger()[indice]; if(!n)return;
+  if(!n.triggers_ativos.some(x=>x.toLowerCase()==='bagworm'))return mostrarPopup('⚠️ Esse NPC não possui Bagworm equipado.');
+  n.bagwormAtivo=!n.bagwormAtivo; salvarEstadoWorldTrigger(); atualizarTokenNPCWorldTrigger(indice); renderizarPainelWTSeNecessario(); mostrarPopup(`👻 ${n.nome}: Bagworm ${n.bagwormAtivo?'ativado':'desativado'}.`);
+}
+function alternarChameleonNPCWorldTrigger(indice){
+  const n=obterSquadNPCsWorldTrigger()[indice]; if(!n)return;
+  if(!n.triggers_ativos.some(x=>x.toLowerCase()==='chameleon'))return mostrarPopup('⚠️ Esse NPC não possui Chameleon equipado.');
+  n.chameleonAtivo=!n.chameleonAtivo; salvarEstadoWorldTrigger(); atualizarTokenNPCWorldTrigger(indice); renderizarPainelWTSeNecessario(); mostrarPopup(`🫥 ${n.nome}: Chameleon ${n.chameleonAtivo?'ativado':'desativado'}.`);
+}
+function usarTriggerNPCWorldTrigger(indice){
+  const n=obterSquadNPCsWorldTrigger()[indice]; if(!n)return;
+  const nomes=(n.triggers_ativos||[]).join(', ')||'nenhum';
+  mostrarPopup(`⚔️ ${n.nome}: ${nomes}`);
+}
+function normalizarIdTokenWT(valor){ return String(valor||'jogador').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'') || 'jogador'; }
+function obterPosicaoFormacaoNPCWT(indice, baseX, baseY){
+  const offsets=[[0,0],[6,0],[0,6],[6,6]];
+  const o=offsets[indice+1]||[6,6];
+  return {x:Math.max(2,Math.min(98,baseX+o[0])),y:Math.max(2,Math.min(98,baseY+o[1]))};
+}
+function sincronizarTokensSquadWorldTrigger(baseX=10,baseY=10,tamanho=45){
+  if(!worldTriggerAtivo()) return;
+  const fichaNpcs=Array.isArray(dadosFichaAtual?.wt_squad_npcs)?dadosFichaAtual.wt_squad_npcs:[];
+  if(fichaNpcs.length!==3) return;
+  const npcs=obterSquadNPCsWorldTrigger(); if(npcs.length!==3)return;
+  const nick=obterMeuNickWT(); const base=normalizarIdTokenWT(nick);
+  npcs.forEach((n,i)=>{
+    const pos=obterPosicaoFormacaoNPCWT(i,baseX,baseY);
+    const id=`token_${base}_npc_${i+1}`;
+    criarElementoToken(id,n.nome,pos.x,pos.y,tamanho,n.imagem||'',Number(n.hpMax)||50,Number(n.hpMax)||50,true,{ownerNick:nick,squad:worldTriggerEstado.meuSquad,bagworm:!!n.bagwormAtivo,chameleon:!!n.chameleonAtivo,trion:n.trion||null,triggers:n.triggers_ativos||[],tipo:'npc_squad',npcIndex:i});
+    if(canalMesa) canalMesa.send({type:'broadcast',event:'vtt_mover_token',payload:{id,nome:n.nome,x:pos.x,y:pos.y,tamanho,imagem:n.imagem||'',hpAtual:Number(n.hpMax)||50,hpMax:Number(n.hpMax)||50,campanha_id:obterCampanhaIdAtual(),squad:worldTriggerEstado.meuSquad||'',bagworm:!!n.bagwormAtivo,chameleon:!!n.chameleonAtivo,trion:n.trion||null,triggers:n.triggers_ativos||[],ownerNick:nick,tipo:'npc_squad',npcIndex:i}});
+  });
+}
 function renderizarPainelWorldTrigger() {
   if (!worldTriggerAtivo()) return '';
   return `
@@ -364,6 +466,7 @@ function renderizarPainelWorldTrigger() {
         <label class="wt-fov-controle">👁️ FOV <input id="wt-fov-range" type="range" min="3" max="20" step="1" value="${worldTriggerEstado.campoVisaoCelulas || 8}" oninput="alterarCampoVisaoWorldTrigger(this.value)"> <span id="wt-fov-label">${worldTriggerEstado.campoVisaoCelulas || 8}c</span></label>
       </div>
       ${renderizarTriggersAtivosNoMapa()}
+      ${renderizarSquadNPCsNoMapaWT()}
       <div class="wt-radar-lista" id="wt-radar-lista"><div class="wt-radar-vazio">Aguardando sinais...</div></div>
     </div>`;
 }
@@ -613,8 +716,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             payload.payload.imagem || '', 
             payload.payload.hpAtual ?? 50, 
             payload.payload.hpMax ?? 50, 
-            String(payload.payload.nome || '').trim().toLowerCase() === obterMeuNickWT().trim().toLowerCase(),
-            { squad: payload.payload.squad || '', bagworm: !!payload.payload.bagworm, chameleon: !!payload.payload.chameleon, trion: payload.payload.trion ?? null, triggers: Array.isArray(payload.payload.triggers) ? payload.payload.triggers : [] }
+            (String(payload.payload.ownerNick || payload.payload.nome || '').trim().toLowerCase() === obterMeuNickWT().trim().toLowerCase()) || ehMestreGlobal,
+            { ownerNick: payload.payload.ownerNick || '', tipo: payload.payload.tipo || '', npcIndex: payload.payload.npcIndex, squad: payload.payload.squad || '', bagworm: !!payload.payload.bagworm, chameleon: !!payload.payload.chameleon, trion: payload.payload.trion ?? null, triggers: Array.isArray(payload.payload.triggers) ? payload.payload.triggers : [] }
           );
         })
         .subscribe((status) => {
@@ -664,7 +767,7 @@ window.addEventListener('message', async (event) => {
 
   const foiEdicao = event.data.modo === 'edicao';
   dadosFichaAtual = event.data.dados;
-  if (worldTriggerAtivo()) { worldTriggerEstado.triggersAtivos = normalizarTriggersFichaWT(dadosFichaAtual); salvarEstadoWorldTrigger(); }
+  if (worldTriggerAtivo()) { worldTriggerEstado.triggersAtivos = normalizarTriggersFichaWT(dadosFichaAtual); sincronizarSquadNPCsEstadoWT(dadosFichaAtual); salvarEstadoWorldTrigger(); }
   if (foiEdicao && event.data.userId) {
     fichaEditandoUserId = event.data.userId;
   }
@@ -1571,15 +1674,6 @@ async function abrirFichaDoSistema(id){
 }
 
 // --- NAVEGAÇÃO DE ABAS ---
-function sistemaCamelotAtivo() {
-  const cfg = obterConfiguracaoSistemaAtualWT() || {};
-  return !!(
-    cfg?.tipo === 'legado' ||
-    cfg?.ficha === 'ficha-editor.html' ||
-    /crônicas? de camelot/i.test(String(sistemaAtual?.nome || ''))
-  );
-}
-
 function mudarAba(nomeAba, evento) {
   const abasValidas = ['ficha', 'campanhas', 'sistemas', 'grupo', 'mapa', 'rolagens', 'galeria'];
   if (!abasValidas.includes(nomeAba)) return;
@@ -1693,7 +1787,7 @@ async function carregarFichaDoUsuario(userId) {
   if (data && data.dados_ficha) {
     dadosFichaAtual = data.dados_ficha;
     renderizarFichaNaTela(dadosFichaAtual);
-    if (worldTriggerAtivo()) { worldTriggerEstado.triggersAtivos = normalizarTriggersFichaWT(dadosFichaAtual); salvarEstadoWorldTrigger(); renderizarPainelWTSeNecessario(); }
+    if (worldTriggerAtivo()) { worldTriggerEstado.triggersAtivos = normalizarTriggersFichaWT(dadosFichaAtual); sincronizarSquadNPCsEstadoWT(dadosFichaAtual); salvarEstadoWorldTrigger(); renderizarPainelWTSeNecessario(); }
   }
 }
 
@@ -2283,23 +2377,24 @@ function confirmarCriacaoToken() {
   executarAdicionarTokenMesa(tamanho, imagem, hpMax, hpMax);
 }
 
-function executarAdicionarTokenMesa(tamanho = 45, imagem = '', hpMax = 50, hpAtual = 50) {
+async function executarAdicionarTokenMesa(tamanho = 45, imagem = '', hpMax = 50, hpAtual = 50) {
   const userNick = document.getElementById('user-nick-display')?.innerText || document.getElementById('auth-nick')?.value || 'Cavaleiro';
   const tokenID = 'token_' + (userNick.toLowerCase().replace(/[^a-z0-9]/g, '_'));
 
-  if (worldTriggerAtivo()) carregarEstadoWorldTrigger();
+  if (worldTriggerAtivo()) { carregarEstadoWorldTrigger(); await carregarTriggersDaFichaWorldTrigger(); }
   criarElementoToken(tokenID, userNick, 10, 10, tamanho, imagem, hpAtual, hpMax, true, {
     squad: worldTriggerEstado.meuSquad,
     bagworm: worldTriggerEstado.bagworm,
     chameleon: worldTriggerEstado.chameleon,
-    triggers: [...worldTriggerEstado.triggersAtivos]
+    triggers: [...worldTriggerEstado.triggersAtivos], ownerNick: userNick, tipo:'player'
   });
+  if (worldTriggerAtivo()) sincronizarTokensSquadWorldTrigger(10,10,tamanho);
   
   if (canalMesa) {
     canalMesa.send({
       type: 'broadcast',
       event: 'vtt_mover_token',
-      payload: { id: tokenID, nome: userNick, x: 10, y: 10, tamanho, imagem, hpAtual, hpMax, campanha_id: obterCampanhaIdAtual(), squad: worldTriggerEstado.meuSquad || '', bagworm: !!worldTriggerEstado.bagworm, chameleon: !!worldTriggerEstado.chameleon, triggers: [...worldTriggerEstado.triggersAtivos] }
+      payload: { id: tokenID, nome: userNick, x: 10, y: 10, tamanho, imagem, hpAtual, hpMax, campanha_id: obterCampanhaIdAtual(), squad: worldTriggerEstado.meuSquad || '', bagworm: !!worldTriggerEstado.bagworm, chameleon: !!worldTriggerEstado.chameleon, triggers: [...worldTriggerEstado.triggersAtivos], ownerNick: userNick, tipo:'player' }
     });
   }
   mostrarPopup('🛡️ Token posicionado na Távola!');
@@ -2330,6 +2425,9 @@ function criarElementoToken(id, nome, x, y, tamanho = 45, imagem = '', hpAtual =
   token.dataset.tokenChameleon = String(metadados.chameleon !== undefined ? !!metadados.chameleon : token.dataset.tokenChameleon === 'true');
   token.dataset.tokenTriggers = JSON.stringify(Array.isArray(metadados.triggers) ? metadados.triggers : (token.dataset.tokenTriggers ? JSON.parse(token.dataset.tokenTriggers) : []));
   token.dataset.tokenTrion = metadados.trion ?? token.dataset.tokenTrion ?? '';
+  token.dataset.tokenOwnerNick = metadados.ownerNick ?? token.dataset.tokenOwnerNick ?? '';
+  token.dataset.tokenTipo = metadados.tipo ?? token.dataset.tokenTipo ?? '';
+  token.dataset.tokenNpcIndex = metadados.npcIndex != null ? String(metadados.npcIndex) : (token.dataset.tokenNpcIndex || '');
 
   token.style.width = `${tamanho}px`;
   token.style.height = `${tamanho}px`;
@@ -2456,7 +2554,10 @@ function transmitirMovimentoToken(token, x, y) {
       bagworm: token.dataset.tokenBagworm === 'true',
       chameleon: token.dataset.tokenChameleon === 'true',
       trion: token.dataset.tokenTrion || null,
-      triggers: (() => { try { return JSON.parse(token.dataset.tokenTriggers || '[]'); } catch (err) { return []; } })()
+      triggers: (() => { try { return JSON.parse(token.dataset.tokenTriggers || '[]'); } catch (err) { return []; } })(),
+      ownerNick: token.dataset.tokenOwnerNick || '',
+      tipo: token.dataset.tokenTipo || '',
+      npcIndex: token.dataset.tokenNpcIndex !== '' ? Number(token.dataset.tokenNpcIndex) : null
     }
   });
 }

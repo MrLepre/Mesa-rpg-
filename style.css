@@ -1231,22 +1231,3 @@ body.imagem-mestre-aberta { overflow:hidden !important; }
 
 /* World Trigger — loadout e opções do mapa */
 .wt-triggers-mapa{margin:10px 0;padding:10px;border:1px solid #1e4f68;border-radius:6px;background:#071018}.wt-triggers-mapa>strong{display:block;color:#69d3ff;margin-bottom:7px}.wt-triggers-mapa-lista{display:flex;flex-wrap:wrap;gap:7px}.wt-trigger-btn{background:#0c2433;color:#d7f3ff;border:1px solid #2d91bd;border-radius:5px;padding:7px 9px;cursor:pointer;font:inherit}.wt-trigger-btn:hover,.wt-trigger-btn.ativo{border-color:#69d3ff;box-shadow:0 0 8px rgba(57,184,255,.14)}.wt-trigger-btn small{display:block;color:#8aaaba;font-size:.72rem}.wt-sem-triggers{padding:9px;border:1px dashed #765b2b;border-radius:5px;color:#ffca70;background:#15110a}.wt-slot-group{max-height:360px;overflow:auto}
-
-
-/* =========================================================
-   CRÔNICAS DE CAMELOT — ESCOLHA DE CLASSE DENTRO DA FICHA
-   ========================================================= */
-.escolha-classe-camelot{border-color:#735b2a;background:linear-gradient(145deg,#171923,#0b1017);}
-.subtexto-classe-camelot{display:block;color:#a9a29a;margin-top:3px;font-size:.82rem}
-.classe-badge-camelot{display:inline-flex;align-items:center;padding:6px 10px;border:1px solid #a98232;border-radius:999px;color:#f2d37e;background:#201a0f;font-family:'Cinzel',serif;font-size:.78rem;white-space:nowrap}
-.select-classe-camelot{display:none !important}
-.classes-seletor-camelot{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-top:10px}
-.classe-opcao-camelot{min-height:82px;padding:10px 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:1px solid #3c362b;border-radius:7px;background:#0e131b;color:#c9c1b4;cursor:pointer;transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease,background .15s ease}
-.classe-opcao-camelot span{font-size:1.35rem;line-height:1}
-.classe-opcao-camelot strong{font-family:'Cinzel',serif;color:#dbc17c;font-size:.82rem}
-.classe-opcao-camelot small{font-size:.68rem;color:#8e9aa5;text-align:center}
-.classe-opcao-camelot:hover{transform:translateY(-1px);border-color:#8b6c31}
-.classe-opcao-camelot.selecionada{border-color:#d2a949;background:linear-gradient(145deg,#272014,#15130f);box-shadow:inset 0 0 0 1px rgba(218,177,75,.25),0 0 14px rgba(210,169,73,.08)}
-.descricao-classe-camelot{display:block;margin-top:10px;padding:9px 10px;border-left:2px solid #9a7831;background:#0b1016;color:#bdb5a8;line-height:1.45}
-@media(max-width:900px){.classes-seletor-camelot{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:520px){.classes-seletor-camelot{grid-template-columns:1fr 1fr;gap:7px}.classe-opcao-camelot{min-height:76px;padding:8px 5px}.classe-opcao-camelot strong{font-size:.75rem}.classe-opcao-camelot small{font-size:.62rem}.classe-badge-camelot{font-size:.68rem}}

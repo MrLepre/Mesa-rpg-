@@ -1,0 +1,20 @@
+WORLD TRIGGER — SQUAD DE 3 NPCs
+================================
+
+Esta versão acrescenta ao sistema World Trigger o conceito de Squad pessoal:
+
+1. Cada jogador cria o próprio agente.
+2. Na mesma ficha, o jogador configura exatamente 3 NPCs do seu Squad.
+3. Cada NPC possui nome, função, Trion, HP, imagem e Trigger Holder próprio.
+4. Cada NPC pode ter até 4 Triggers no lado Principal e 4 no Secundário, total de 8 espaços.
+5. O mesmo Trigger pode ocupar Principal e Secundário ao mesmo tempo.
+6. Bail Out continua especial e não ocupa espaço.
+7. Os dados dos 3 NPCs são salvos dentro da própria ficha, em wt_squad_npcs.
+8. Ao colocar o token do jogador no mapa World Trigger, os 3 tokens dos NPCs são criados automaticamente em formação ao redor dele.
+9. Os 4 tokens (jogador + 3 NPCs) ficam sob controle do mesmo jogador.
+10. Cada NPC transmite Squad, Triggers, Trion, Bagworm e Chameleon separadamente.
+11. O FOV continua sendo compartilhado pelo Squad.
+12. Bagworm e Chameleon continuam obedecendo às regras de visibilidade já implementadas.
+13. Scan/Analysis podem atingir os NPCs inimigos porque eles são agentes reais do Squad.
+
+Não é necessária uma nova tabela Supabase: o kit dos NPCs é parte dos dados_ficha da ficha do jogador.

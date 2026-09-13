@@ -45,8 +45,8 @@ check(!/window\.scrollBy\s*\(/.test(app), 'fallback global de window.scrollBy ai
 check(!/document\.addEventListener\(\s*["']touchmove["']/.test(app), 'listener global de touchmove ainda existe em app.js');
 check(!/canalMesa\.send\s*\(/.test(app), 'app.js ainda envia Realtime diretamente pelo canal legado');
 check(/MAMUS_REALTIME\.send\(/.test(app), 'app.js não usa MAMUS_REALTIME.send');
-check(/app\.js\?v=marco10-cleanup-v1/.test(index), 'index.html não está com cache-bust do Marco 10');
-check(/mamus-cache-v25/.test(sw), 'service-worker não está na versão de cache esperada');
+check(/app\.js\?v=marco12-realtime-v3/.test(index), 'index.html não está com cache-bust do Marco 10');
+check(/mamus-cache-v28/.test(sw), 'service-worker não está na versão de cache esperada');
 check(/js\/social\/social\.js/.test(index), 'index.html não carrega o módulo de Comunidade');
 for (const stale of ['app.js.bak','style.css.bak','index.html.bak','app_head.txt']) {
   check(!fs.existsSync(path.join(root, stale)), `artefato legado ainda presente: ${stale}`);

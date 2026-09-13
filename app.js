@@ -15,6 +15,114 @@ let pastaGaleriaAtual = 'Todas';
 let dadosGaleriaAtual = [];
 let imagemMestreAberta = false;
 
+// Constantes de configuração declaradas antes de qualquer callback/evento.
+// Isso evita TDZ quando funções são acionadas durante a inicialização da página.
+const CENTRAL_DASHBOARDS = {
+  legado: {
+    titulo: 'Crônicas de Camelot',
+    descricao: 'Mesa medieval, personagens, mapa e recursos da campanha.',
+    badge: '⚔️ Camelot',
+    widgets: [
+      {icon:'🛡️', titulo:'Minha Ficha', texto:'Personagem, atributos e evolução.', aba:'ficha'},
+      {icon:'🗺️', titulo:'Mesa Tática', texto:'Mapa, grid, tokens e HP.', aba:'mapa'},
+      {icon:'🎲', titulo:'Rolagens', texto:'Dados e histórico da mesa.', aba:'rolagens'}
+    ]
+  },
+  elarion: {
+    titulo: 'Elarion — Sistema de Joias e Luvas',
+    descricao: 'A Central destaca os elementos mais importantes de Elarion: Joias, Luvas e progressão.',
+    badge: '💎 Elarion',
+    widgets: [
+      {icon:'💎', titulo:'Joias', texto:'Consulte a ficha para acompanhar suas Joias e combinações.', aba:'ficha'},
+      {icon:'🧤', titulo:'Luvas', texto:'Acompanhe sua fase e evolução da Luva.', aba:'ficha'},
+      {icon:'📈', titulo:'Progressão', texto:'Evolução do personagem e melhorias.', aba:'ficha'},
+      {icon:'📖', titulo:'Bestiário', texto:'Criaturas disponíveis e criação de tokens.', aba:'bestiario'}
+    ]
+  },
+  eter_brasas: {
+    titulo: 'Éter & Brasas',
+    descricao: 'O painel do sistema reúne calendário, economia e notícias do mundo.',
+    badge: '🔥 Éter & Brasas',
+    widgets: [
+      {icon:'🗓️', titulo:'Calendário', texto:'Ano, dia atual e marcos do calendário.', aba:'calendario'},
+      {icon:'💰', titulo:'Economia', texto:'Mercados, mercadorias e eventos econômicos.', aba:'economia'},
+      {icon:'📰', titulo:'Jornais', texto:'Últimos acontecimentos publicados na campanha.', aba:'jornais'},
+      {icon:'📖', titulo:'Bestiário', texto:'Criaturas e criação de tokens.', aba:'bestiario'}
+    ]
+  },
+  noctavell: {
+    titulo: 'Noctavell',
+    descricao: 'O painel destaca Véu, Pactos e recursos sobrenaturais do personagem.',
+    badge: '🕯️ Noctavell',
+    widgets: [
+      {icon:'🕯️', titulo:'Véu', texto:'Acessar os módulos sobrenaturais da campanha.', aba:'noctavell'},
+      {icon:'👁️', titulo:'Entidades', texto:'Consultar as entidades e informações do Véu.', aba:'noctavell'},
+      {icon:'🧠', titulo:'Sanidade', texto:'Acompanhar a situação do personagem.', aba:'ficha'},
+      {icon:'🤝', titulo:'Pactos', texto:'Gerenciar informações do personagem.', aba:'noctavell'}
+    ]
+  },
+  olimpia_pangeia: {
+    titulo: 'Olímpia — Pangeia',
+    descricao: 'A Central prioriza personagem, progressão e exploração do mundo.',
+    badge: '🌌 Pangeia',
+    widgets: [
+      {icon:'⚔️', titulo:'Classe', texto:'Abrir ficha e acompanhar classe e estilo.', aba:'ficha'},
+      {icon:'💎', titulo:'Jóias', texto:'Abrir ficha para acompanhar as Joias.', aba:'ficha'},
+      {icon:'📈', titulo:'Progressão', texto:'Nível, XP e evolução do personagem.', aba:'ficha'},
+      {icon:'🗺️', titulo:'Mapa', texto:'Explorar a mesa e o mundo da campanha.', aba:'mapa'}
+    ]
+  },
+  sobreviventes_fronteira: {
+    titulo: 'Sobreviventes da Fronteira',
+    descricao: 'Painel focado em progressão, órbitas, Moldagem de Mana e sobrevivência.',
+    badge: '🌀 Sobreviventes',
+    widgets: [
+      {icon:'🧱', titulo:'Linhagem', texto:'Grau de Linhagem e progressão.', aba:'ficha'},
+      {icon:'🌌', titulo:'Órbitas', texto:'Acompanhar a construção do personagem.', aba:'ficha'},
+      {icon:'✨', titulo:'Moldagem de Mana', texto:'Consultar e evoluir técnicas.', aba:'ficha'},
+      {icon:'🗺️', titulo:'Mapa', texto:'Abrir a mesa tática.', aba:'mapa'}
+    ]
+  },
+  noites_em_tokyo: {
+    titulo: 'Noites em Tokyo',
+    descricao: 'A Central destaca RC, Kagune, Fome, CCG e progressão.',
+    badge: '🌃 Noites em Tokyo',
+    widgets: [
+      {icon:'🩸', titulo:'RC / Kakuja', texto:'Abrir ficha para acompanhar RC e evolução.', aba:'ficha'},
+      {icon:'👁️', titulo:'Kagune', texto:'Consultar a biologia e o combate.', aba:'ficha'},
+      {icon:'🍖', titulo:'Fome', texto:'Acompanhar Fome e recursos do personagem.', aba:'ficha'},
+      {icon:'🏢', titulo:'CCG', texto:'Arquétipos, Quinques e informações do sistema.', aba:'ficha'}
+    ]
+  },
+  world_trigger: {
+    titulo: 'World Trigger RPG',
+    descricao: 'Painel tático para agentes, Squads, Trion e leitura do campo.',
+    badge: '⚡ World Trigger',
+    widgets: [
+      {icon:'👥', titulo:'Squad', texto:'Seu Squad, composição e NPCs.', aba:'ficha'},
+      {icon:'📡', titulo:'Radar', texto:'Abrir a mesa para visualizar os sinais detectados.', aba:'mapa'},
+      {icon:'🛡️', titulo:'Triggers', texto:'Consultar seu equipamento e configurações.', aba:'ficha'},
+      {icon:'🗺️', titulo:'Mapa Tático', texto:'Campo de batalha, cobertura e FOV.', aba:'mapa'}
+    ]
+  }
+};
+
+const MOBILE_NAV_ITEMS = [
+  { aba:'grupo', icone:'👥', nome:'Grupo' },
+  { aba:'sessoes', icone:'🎬', nome:'Sessões' },
+  { aba:'bestiario', icone:'📖', nome:'Bestiário' },
+  { aba:'guias', icone:'📚', nome:'Guias' },
+  { aba:'economia', icone:'💰', nome:'Economia' },
+  { aba:'jornais', icone:'📰', nome:'Jornais' },
+  { aba:'calendario', icone:'🗓️', nome:'Calendário' },
+  { aba:'comunidade', icone:'🌐', nome:'Comunidade' },
+  { aba:'campanhas', icone:'🏰', nome:'Campanhas' },
+  { aba:'diario', icone:'📔', nome:'Diário' },
+  { aba:'galeria', icone:'💬', nome:'Galeria' },
+  { aba:'noctavell', icone:'🕯️', nome:'Véu' },
+  { aba:'sistemas', icone:'⚙️', nome:'Sistemas' }
+];
+
 
 
 
@@ -144,10 +252,9 @@ function atualizarStatusConexao(estado, texto) {
   const status = document.getElementById('status-conexao');
   const label = document.getElementById('status-conexao-texto');
   if (!status) return;
-  status.classList.remove('online', 'offline', 'connecting');
+  status.classList.remove('online', 'offline');
   if (estado === 'online') status.classList.add('online');
-  else if (estado === 'offline') status.classList.add('offline');
-  else if (estado === 'connecting') status.classList.add('connecting');
+  if (estado === 'offline') status.classList.add('offline');
   if (label) label.textContent = texto;
 }
 
@@ -203,6 +310,19 @@ window.MAMUS_WT_HOOKS = {
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // Supabase/Realtime primeiro: uma falha de UI ou de dados não pode impedir a Távola.
+  try {
+    if (!supabaseClient) supabaseClient = window.MAMUS_SUPABASE || window.MAMUS_SUPABASE_BOOT?.inicializar?.() || null;
+    if (supabaseClient) window.MAMUS_SUPABASE = supabaseClient;
+    atualizarStatusConexao(supabaseClient ? 'online' : 'offline', supabaseClient ? 'Conectando à Távola...' : 'Modo local — Supabase indisponível.');
+    if (supabaseClient && window.MAMUS_REALTIME?.connect) {
+      canalMesa = await window.MAMUS_REALTIME.connect(supabaseClient) || null;
+    }
+  } catch (err) {
+    atualizarStatusConexao('offline', 'Erro ao iniciar a Távola');
+    console.error('[MaMuS] Falha ao iniciar Realtime:', err);
+  }
+
   restaurarEstadoSidebar();
   inicializarInteracoesMobile();
   document.getElementById('diario-arquivos')?.addEventListener('change', adicionarImagensDiario);
@@ -218,17 +338,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderizarCentralCampanha();
   setInterval(() => { if (MAMUS_STATE.ui.currentTab === 'inicio' && MAMUS_STATE.campaign.current) renderizarAtividadesCentral(); }, 60000);
 
-  if (!supabaseClient) {
-    supabaseClient = window.MAMUS_SUPABASE || window.MAMUS_SUPABASE_BOOT?.inicializar?.() || null;
-  }
-  if (supabaseClient) window.MAMUS_SUPABASE = supabaseClient;
-
-  // O Realtime precisa iniciar independentemente de falhas em outras consultas.
-  // Assim, um erro em campanhas/ficha nunca deixa o indicador preso em 'Conectando'.
-  atualizarStatusConexao(supabaseClient ? 'connecting' : 'offline', supabaseClient ? 'Conectando à Távola...' : 'Modo local — Supabase indisponível.');
-  if (supabaseClient) {
-    canalMesa = await globalThis.MAMUS_REALTIME?.connect(supabaseClient) || null;
-  }
   garantirAbasEconomiaJornaisVisiveis();
 
   try {
@@ -2183,96 +2292,6 @@ function centralAnoGenerico() {
   return Number.isFinite(possivel) && possivel > 0 ? possivel : 1;
 }
 
-const CENTRAL_DASHBOARDS = {
-  legado: {
-    titulo: 'Crônicas de Camelot',
-    descricao: 'Mesa medieval, personagens, mapa e recursos da campanha.',
-    badge: '⚔️ Camelot',
-    widgets: [
-      {icon:'🛡️', titulo:'Minha Ficha', texto:'Personagem, atributos e evolução.', aba:'ficha'},
-      {icon:'🗺️', titulo:'Mesa Tática', texto:'Mapa, grid, tokens e HP.', aba:'mapa'},
-      {icon:'🎲', titulo:'Rolagens', texto:'Dados e histórico da mesa.', aba:'rolagens'}
-    ]
-  },
-  elarion: {
-    titulo: 'Elarion — Sistema de Joias e Luvas',
-    descricao: 'A Central destaca os elementos mais importantes de Elarion: Joias, Luvas e progressão.',
-    badge: '💎 Elarion',
-    widgets: [
-      {icon:'💎', titulo:'Joias', texto:'Consulte a ficha para acompanhar suas Joias e combinações.', aba:'ficha'},
-      {icon:'🧤', titulo:'Luvas', texto:'Acompanhe sua fase e evolução da Luva.', aba:'ficha'},
-      {icon:'📈', titulo:'Progressão', texto:'Evolução do personagem e melhorias.', aba:'ficha'},
-      {icon:'📖', titulo:'Bestiário', texto:'Criaturas disponíveis e criação de tokens.', aba:'bestiario'}
-    ]
-  },
-  eter_brasas: {
-    titulo: 'Éter & Brasas',
-    descricao: 'O painel do sistema reúne calendário, economia e notícias do mundo.',
-    badge: '🔥 Éter & Brasas',
-    widgets: [
-      {icon:'🗓️', titulo:'Calendário', texto:'Ano, dia atual e marcos do calendário.', aba:'calendario'},
-      {icon:'💰', titulo:'Economia', texto:'Mercados, mercadorias e eventos econômicos.', aba:'economia'},
-      {icon:'📰', titulo:'Jornais', texto:'Últimos acontecimentos publicados na campanha.', aba:'jornais'},
-      {icon:'📖', titulo:'Bestiário', texto:'Criaturas e criação de tokens.', aba:'bestiario'}
-    ]
-  },
-  noctavell: {
-    titulo: 'Noctavell',
-    descricao: 'O painel destaca Véu, Pactos e recursos sobrenaturais do personagem.',
-    badge: '🕯️ Noctavell',
-    widgets: [
-      {icon:'🕯️', titulo:'Véu', texto:'Acessar os módulos sobrenaturais da campanha.', aba:'noctavell'},
-      {icon:'👁️', titulo:'Entidades', texto:'Consultar as entidades e informações do Véu.', aba:'noctavell'},
-      {icon:'🧠', titulo:'Sanidade', texto:'Acompanhar a situação do personagem.', aba:'ficha'},
-      {icon:'🤝', titulo:'Pactos', texto:'Gerenciar informações do personagem.', aba:'noctavell'}
-    ]
-  },
-  olimpia_pangeia: {
-    titulo: 'Olímpia — Pangeia',
-    descricao: 'A Central prioriza personagem, progressão e exploração do mundo.',
-    badge: '🌌 Pangeia',
-    widgets: [
-      {icon:'⚔️', titulo:'Classe', texto:'Abrir ficha e acompanhar classe e estilo.', aba:'ficha'},
-      {icon:'💎', titulo:'Jóias', texto:'Abrir ficha para acompanhar as Joias.', aba:'ficha'},
-      {icon:'📈', titulo:'Progressão', texto:'Nível, XP e evolução do personagem.', aba:'ficha'},
-      {icon:'🗺️', titulo:'Mapa', texto:'Explorar a mesa e o mundo da campanha.', aba:'mapa'}
-    ]
-  },
-  sobreviventes_fronteira: {
-    titulo: 'Sobreviventes da Fronteira',
-    descricao: 'Painel focado em progressão, órbitas, Moldagem de Mana e sobrevivência.',
-    badge: '🌀 Sobreviventes',
-    widgets: [
-      {icon:'🧱', titulo:'Linhagem', texto:'Grau de Linhagem e progressão.', aba:'ficha'},
-      {icon:'🌌', titulo:'Órbitas', texto:'Acompanhar a construção do personagem.', aba:'ficha'},
-      {icon:'✨', titulo:'Moldagem de Mana', texto:'Consultar e evoluir técnicas.', aba:'ficha'},
-      {icon:'🗺️', titulo:'Mapa', texto:'Abrir a mesa tática.', aba:'mapa'}
-    ]
-  },
-  noites_em_tokyo: {
-    titulo: 'Noites em Tokyo',
-    descricao: 'A Central destaca RC, Kagune, Fome, CCG e progressão.',
-    badge: '🌃 Noites em Tokyo',
-    widgets: [
-      {icon:'🩸', titulo:'RC / Kakuja', texto:'Abrir ficha para acompanhar RC e evolução.', aba:'ficha'},
-      {icon:'👁️', titulo:'Kagune', texto:'Consultar a biologia e o combate.', aba:'ficha'},
-      {icon:'🍖', titulo:'Fome', texto:'Acompanhar Fome e recursos do personagem.', aba:'ficha'},
-      {icon:'🏢', titulo:'CCG', texto:'Arquétipos, Quinques e informações do sistema.', aba:'ficha'}
-    ]
-  },
-  world_trigger: {
-    titulo: 'World Trigger RPG',
-    descricao: 'Painel tático para agentes, Squads, Trion e leitura do campo.',
-    badge: '⚡ World Trigger',
-    widgets: [
-      {icon:'👥', titulo:'Squad', texto:'Seu Squad, composição e NPCs.', aba:'ficha'},
-      {icon:'📡', titulo:'Radar', texto:'Abrir a mesa para visualizar os sinais detectados.', aba:'mapa'},
-      {icon:'🛡️', titulo:'Triggers', texto:'Consultar seu equipamento e configurações.', aba:'ficha'},
-      {icon:'🗺️', titulo:'Mapa Tático', texto:'Campo de batalha, cobertura e FOV.', aba:'mapa'}
-    ]
-  }
-};
-
 function centralTipoSistema() {
   const tipo = String(MAMUS_STATE.system.current?.configuracao?.tipo || '').toLowerCase();
   if (CENTRAL_DASHBOARDS[tipo]) return tipo;
@@ -3223,22 +3242,6 @@ function abrirVisualizadorImagem(url, pasta, nome = 'Imagem da campanha') {
 // ==========================================================
 // FASE 1.5 — EXPERIÊNCIA MOBILE / TABLET
 // ==========================================================
-const MOBILE_NAV_ITEMS = [
-  { aba:'grupo', icone:'👥', nome:'Grupo' },
-  { aba:'sessoes', icone:'🎬', nome:'Sessões' },
-  { aba:'bestiario', icone:'📖', nome:'Bestiário' },
-  { aba:'guias', icone:'📚', nome:'Guias' },
-  { aba:'economia', icone:'💰', nome:'Economia' },
-  { aba:'jornais', icone:'📰', nome:'Jornais' },
-  { aba:'calendario', icone:'🗓️', nome:'Calendário' },
-  { aba:'comunidade', icone:'🌐', nome:'Comunidade' },
-  { aba:'campanhas', icone:'🏰', nome:'Campanhas' },
-  { aba:'diario', icone:'📔', nome:'Diário' },
-  { aba:'galeria', icone:'💬', nome:'Galeria' },
-  { aba:'noctavell', icone:'🕯️', nome:'Véu' },
-  { aba:'sistemas', icone:'⚙️', nome:'Sistemas' }
-];
-
 function atualizarNavegacaoMobile() {
   document.querySelectorAll('.mobile-nav-item[data-mobile-aba]').forEach(btn => {
     btn.classList.toggle('ativo', btn.dataset.mobileAba === MAMUS_STATE.ui.currentTab);

@@ -43,7 +43,6 @@
     call('atualizarStatusConexao', status, text);
     try {
       global.MAMUS_STATE_API?.set('realtime.connected', status === 'online');
-      global.MAMUS_STATE_API?.set('realtime.status', status);
       global.MAMUS_STATE_API?.set('realtime.channel', channel ? CHANNEL_NAME : null);
     } catch (_) {}
   }
@@ -156,101 +155,27 @@
       });
   }
 
-  let reconnectTimer = null;
-  let reconnectAttempt = 0;
-  let connectionGeneration = 0;
-
-  function clearReconnectTimer() {
-    if (reconnectTimer) {
-      clearTimeout(reconnectTimer);
-      reconnectTimer = null;
-    }
-  }
-
-  function scheduleReconnect() {
-    if (!client || reconnectTimer) return;
-    const attempt = reconnectAttempt++;
-    const delay = Math.min(30000, 1000 * Math.pow(2, Math.min(attempt, 5)));
-    reconnectTimer = setTimeout(async () => {
-      reconnectTimer = null;
-      if (!client || channel) return;
-      await connect(client, { reconnect: true });
-    }, delay);
-  }
-
-  async function connect(supabase, options = {}) {
+  async function connect(supabase) {
     if (!supabase) {
       updateConnection('offline', 'Modo local — Supabase indisponível.');
       return null;
     }
 
-    client = supabase;
-    clearReconnectTimer();
-
     if (channel) return channel;
 
-    const generation = ++connectionGeneration;
-    updateConnection('connecting', 'Conectando à Távola...');
-
+    client = supabase;
     try {
-      const target = client.channel(CHANNEL_NAME, {
-        config: { broadcast: { self: false } }
+      channel = client.channel(CHANNEL_NAME);
+      registerHandlers(channel);
+      channel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') updateConnection('online', 'Távola sincronizada');
+        else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') updateConnection('offline', 'Sincronização indisponível');
       });
-      channel = target;
-      registerHandlers(target);
-
-      const timeout = setTimeout(() => {
-        if (generation !== connectionGeneration || channel !== target) return;
-        console.warn('[MaMuS Realtime] timeout aguardando SUBSCRIBED.');
-        updateConnection('offline', 'Tempo esgotado — tentando reconectar...');
-        try { client.removeChannel(target); } catch (_) {}
-        channel = null;
-        scheduleReconnect();
-      }, 12000);
-
-      target.subscribe((status, err) => {
-        if (generation !== connectionGeneration || channel !== target) return;
-
-        if (status === 'SUBSCRIBED') {
-          clearTimeout(timeout);
-          reconnectAttempt = 0;
-          updateConnection('online', 'Távola sincronizada');
-          return;
-        }
-
-        if (status === 'CHANNEL_ERROR') {
-          clearTimeout(timeout);
-          console.error('[MaMuS Realtime] CHANNEL_ERROR:', err || 'sem detalhes');
-          updateConnection('offline', 'Erro na Távola — tentando reconectar...');
-          channel = null;
-          try { client.removeChannel(target); } catch (_) {}
-          scheduleReconnect();
-          return;
-        }
-
-        if (status === 'TIMED_OUT') {
-          clearTimeout(timeout);
-          updateConnection('offline', 'Tempo esgotado — tentando reconectar...');
-          channel = null;
-          try { client.removeChannel(target); } catch (_) {}
-          scheduleReconnect();
-          return;
-        }
-
-        if (status === 'CLOSED') {
-          clearTimeout(timeout);
-          channel = null;
-          updateConnection('offline', 'Távola desconectada — reconectando...');
-          scheduleReconnect();
-        }
-      });
-
-      return target;
+      return channel;
     } catch (err) {
       channel = null;
-      updateConnection('offline', 'Falha na Távola — tentando reconectar...');
+      updateConnection('offline', 'Erro de conexão');
       console.error('[MaMuS Realtime] erro ao conectar:', err);
-      scheduleReconnect();
       return null;
     }
   }
